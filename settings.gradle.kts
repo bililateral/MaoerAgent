@@ -1,4 +1,4 @@
-rootProject.name = "MaoerLite"
+rootProject.name = "MaoerAgent"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 // Prefer local SDK's aapt2 when available to avoid downloading the

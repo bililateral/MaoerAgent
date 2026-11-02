@@ -48,7 +48,7 @@ def create_app(settings: Settings, transport=None, agent_db=None):
                 app.state.source_queries = sources
                 yield
 
-    app = FastAPI(title='Maoer Local Agent', docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+    app = FastAPI(title='MaoerAgent', docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     gate = Gate(settings.model_requests_per_minute)
     app.state.gate = gate
     from maoer_agent.api.routes import register

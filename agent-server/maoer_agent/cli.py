@@ -76,7 +76,7 @@ def stream_reply(client, context, sleep=time.sleep, clock=time.monotonic):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Chat with the local Maoer model gateway')
+    parser = argparse.ArgumentParser(description='Chat with the local MaoerAgent model gateway')
     parser.add_argument('--message', help='Send a single message instead of interactive chat')
     parser.add_argument('--port', type=int, default=8787)
     args = parser.parse_args()
@@ -85,7 +85,7 @@ def main():
     except OSError:
         print('请先启动本地服务端。')
         return 1
-    messages = [{'role': 'system', 'content': '你是猫耳播客应用的文字助手。当前是本地模型连通性体验，尚未连接节目目录、收听历史或播放器。可以进行文字交流，但不得声称已经查询目录、操作播放或设置定时。简洁地用中文回答。'}]
+    messages = [{'role': 'system', 'content': '你是MaoerAgent 播客应用的文字助手。当前是本地模型连通性体验，尚未连接节目目录、收听历史或播放器。可以进行文字交流，但不得声称已经查询目录、操作播放或设置定时。简洁地用中文回答。'}]
     with httpx.Client(base_url=f'http://127.0.0.1:{args.port}', timeout=100, trust_env=False,
                       headers={'Authorization': 'Bearer ' + token}) as client:
         while True:

@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		3A4020239E63BD9D5713768F /* MaoerLite.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MaoerLite.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3A4020239E63BD9D5713768F /* MaoerAgent.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MaoerAgent.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -59,7 +59,7 @@
 		C3A729165A3E8FE2A8675AAB /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				3A4020239E63BD9D5713768F /* MaoerLite.app */,
+				3A4020239E63BD9D5713768F /* MaoerAgent.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -87,7 +87,7 @@
 			packageProductDependencies = (
 			);
 			productName = iosApp;
-			productReference = 3A4020239E63BD9D5713768F /* MaoerLite.app */;
+			productReference = 3A4020239E63BD9D5713768F /* MaoerAgent.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */

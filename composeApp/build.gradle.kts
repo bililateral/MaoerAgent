@@ -23,10 +23,10 @@ abstract class GenerateErrorCatalog : DefaultTask() {
         val entries = JsonSlurper().parse(catalog.get().asFile) as Map<String, String>
         require(entries.isNotEmpty() && entries.all { (key, value) -> key.matches(Regex("[a-z][a-z0-9_]*")) && value.isNotBlank() })
         fun literal(value: String) = JsonOutput.toJson(value).replace("$", "\\$")
-        val target = destination.get().file("com/maoer/lite/data/error/GeneratedErrorCatalog.kt").asFile
+        val target = destination.get().file("com/maoer/agent/data/error/GeneratedErrorCatalog.kt").asFile
         target.parentFile.mkdirs()
         target.writeText("// Generated from agent-server/maoer_agent/resources/error_catalog.json. Do not edit.\n" +
-            "package com.maoer.lite.data.error\n\ninternal val errorMessages: Map<String, String> = mapOf(\n" +
+            "package com.maoer.agent.data.error\n\ninternal val errorMessages: Map<String, String> = mapOf(\n" +
             entries.entries.joinToString(",\n") { (key, value) -> "    ${literal(key)} to ${literal(value)}" } + "\n)\n")
     }
 }
@@ -121,12 +121,12 @@ kotlin {
 }
 
 android {
-    namespace = "com.maoer.lite"
+    namespace = "com.maoer.agent"
     // 注意：TOML 中的 android-compileSdk 在这里会变成驼峰命名 android.compileSdk
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "com.maoer.lite"
+        applicationId = "com.maoer.agent"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 2

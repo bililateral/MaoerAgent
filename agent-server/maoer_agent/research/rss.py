@@ -138,7 +138,7 @@ class RssResearch:
             try:
                 async with self.client.stream('GET', source['feed_url'], follow_redirects=True,
                                               headers={'Accept': 'application/rss+xml, application/xml, */*',
-                                                       'User-Agent': 'MaoerLite/0.3 RSS'}, timeout=15) as response:
+                                                       'User-Agent': 'MaoerAgent/0.3 RSS'}, timeout=15) as response:
                     response.raise_for_status()
                     raw = bytearray()
                     async for block in response.aiter_bytes():
