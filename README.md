@@ -1,12 +1,12 @@
-# MaoerLite · 猫耳
+# MaoerAgent
 
-MaoerLite 是一款 Android 播客点播器，以公开 RSS 为内容入口，提供杂志风首页、分类浏览、中文与拼音搜索、收听资料库和大封面播放器。点播助手通过本机或内网 Python 服务理解请求，手机执行目录查询和播放控制，服务端执行 RSS 与网页资料查询。
+MaoerAgent 是一款 Android 播客点播器，以公开 RSS 为内容入口，提供杂志风首页、分类浏览、中文与拼音搜索、收听资料库和大封面播放器。点播助手通过本机或内网 Python 服务理解请求，手机执行目录查询和播放控制，服务端执行 RSS 与网页资料查询。
 
 版本：**1.1.0-dev**（versionCode 2）。内置 **30 个节目、19 个分类**，分集从 RSS 加载。iOS 保留工程入口和接口存根，播放能力尚未完成。
 
 ## 页面预览
 
-以下八张页面图采集自当前 APK 的 Android 真机运行界面，均不包含系统状态栏。播放页展示控制区，点播助手展示真实播放器状态查询。
+以下八张页面图均采集自 Android 真机，不包含系统状态栏。首页、分类、节目、播放及资料库来自 MaoerAgent 应用；点播助手来自同版本、同界面源码的隔离安装，展示空对话头像与建议。播放页展示暂停状态和控制区，首页品牌区采用杂志风布局。
 
 | 首页 | 分类 |
 | --- | --- |
@@ -22,7 +22,7 @@ MaoerLite 是一款 Android 播客点播器，以公开 RSS 为内容入口，�
 
 | 收听历史 | 点播助手 |
 | --- | --- |
-| <img src="docs/screenshots/current-library-history-device.png" alt="资料库：逐集收听历史" width="340"> | <img src="docs/screenshots/current-agent-device.png" alt="点播助手：查询实际分集、暂停状态和倍速" width="340"> |
+| <img src="docs/screenshots/current-library-history-device.png" alt="资料库：逐集收听历史" width="340"> | <img src="docs/screenshots/current-agent-device.png" alt="点播助手：星芒共鸣头像、空对话入口与建议（同源码隔离安装）" width="340"> |
 
 ## 功能说明
 
@@ -83,6 +83,8 @@ Android 下载链路已接入系统 **DownloadManager**，实现任务状态展�
 ### 文字 点播助手
 
 首页点击“点播助手”进入独立聊天页，服务连接统一在右上角设置。支持文字输入、流式回复、真实节目与分集卡片、停止生成、断线恢复及失败后重试当前步骤。页面切换不会主动取消任务；进程重启后可从本地记录恢复。输入框、播放栏与系统键盘分别占位。
+
+助手使用内置的“星芒共鸣”矢量头像。空对话页展示头像，每条助手回复上方显示头像和名称；生成中与已完成回复使用同一标识，正文及表格保留整行宽度。
 
 右上角“新对话”会先删除服务端上一会话的任务记录（含消息、工具结果）和全部 LangGraph 检查点/中间写入，收到确认后再清空当前本地聊天记录、生成新对话 ID。删除失败或断线时保留当前记录并显示“重试删除”，重启也会继续确认删除，不重新创建旧请求。任务未结束时新对话按钮禁用。目前只保存当前会话供恢复，没有可切换的历史会话列表。
 
@@ -203,7 +205,7 @@ Tavily密钥仅保存在服务端私密配置，部署须使用免费账户并�
 
 ```text
 composeApp/src/
-├── commonMain/kotlin/com/maoer/lite/
+├── commonMain/kotlin/com/maoer/agent/
 │   ├── data/podcast/       # 内置目录、RSS、缓存与拼音索引
 │   ├── data/library/       # 收藏、历史、逐集进度与持久化
 │   ├── data/manager/       # 播放状态、队列、定时规则与 PlaybackSnapshotStore 快照存储
@@ -234,7 +236,7 @@ composeApp/src/
 │   └── di/                 # 共享依赖配置
 ├── androidMain/
 │   ├── AndroidManifest.xml # 应用入口、网络及前台播放权限、服务声明
-│   ├── kotlin/com/maoer/lite/
+│   ├── kotlin/com/maoer/agent/
 │   │   ├── MainActivity.kt                   # Android Activity，承载共享 Compose 界面
 │   │   ├── MaoerApplication.kt               # Application 初始化与 Koin 启动
 │   │   ├── Platform.android.kt               # Android 平台信息实现
@@ -425,7 +427,7 @@ composeApp/build/outputs/apk/debug/composeApp-debug.apk
 .\gradlew.bat :composeApp:installDebug
 ```
 
-应用包名为 `com.maoer.lite`。运行时需要联网加载未缓存的 RSS、封面与音频。业务构建不依赖本地维护工具或验收脚本。
+应用包名为 `com.maoer.agent`。使用此包名独立安装，旧版私有数据不自动迁移，助手连接需要重新设置。运行时需要联网加载未缓存的 RSS、封面与音频。业务构建不依赖本地维护工具或验收脚本。
 
 ## Agent 服务端（Python）
 
