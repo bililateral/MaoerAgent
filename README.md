@@ -98,7 +98,7 @@ Android 下载链路已接入系统 **DownloadManager**，实现任务状态展�
 
 意图识别与回答生成通过统一上下文入口使用同一批保留对话、已存摘要及真实引用身份，并记录保留轮次、摘要覆盖轮次和待整理轮次。各阶段按职责组织工具回执和资料，原始执行记录独立保存；播放器当前状态仍由实时查询提供。意图识别使用完整保留轮次中的问答内容，遵循上述会话预算。
 
-移出的旧对话由当前配置的 **DeepSeek Flash（当前中转配置为 `deepseek-v4.1-flash`，关闭思考、不联网）**生成最多 **4,000 字符**的滚动摘要，保留明确偏好、主题、结论与未完成事项。不是每次聊天都额外调用模型，也没有使用 `SummarizationMiddleware`：LangGraph 的 `prepare` 节点在需要时整理，原子保存摘要及已覆盖任务 ID，再进入正常问答。已有摘要与新移出的交流合并，最新纠正优先；摘要请求不携带工具，不会执行播放操作。
+移出的旧对话由当前配置的 **DeepSeek Flash（当前中转配置为 `deepseek-v4.1-flash-1017`，关闭思考、不联网）**生成最多 **4,000 字符**的滚动摘要，保留明确偏好、主题、结论与未完成事项。不是每次聊天都额外调用模型，也没有使用 `SummarizationMiddleware`：LangGraph 的 `prepare` 节点在需要时整理，原子保存摘要及已覆盖任务 ID，再进入正常问答。已有摘要与新移出的交流合并，最新纠正优先；摘要请求不携带工具，不会执行播放操作。
 
 对话显示支持 Markdown 表格、列表、强调和代码块；多列表格超出手机宽度时可横向滚动。“继续”等含糊表达由模型结合上下文判断和澄清，不使用固定回复、关键词拦截或专用工具禁用规则；这类意图识别仍有模型不确定性。标题期号优先识别 No./EP/Vol./第N期等标记，裸数字需有标题分隔，不把年份、年龄或数量前缀统计成期号。
 
@@ -431,7 +431,7 @@ composeApp/build/outputs/apk/debug/composeApp-debug.apk
 
 ## Agent 服务端（Python）
 
-`agent-server/` 使用 FastAPI、Uvicorn 和 HTTPX，代码默认使用官方接口的 `deepseek-flash`，当前部署通过 `agent.env` 覆盖为中转站的 `deepseek-v4.1-flash`，在模型网关上运行 LangGraph 任务流程。可用模型名称以所配置供应商的接口为准。模型节点生成回复或工具调用，设备节点中断等待 Android 回执，收到结果后从 SQLite 检查点继续。langchain-core 用于运行上下文和基础协议，未引入完整 LangChain Agent。
+`agent-server/` 使用 FastAPI、Uvicorn 和 HTTPX，代码默认使用官方接口的 `deepseek-flash`，当前部署通过 `agent.env` 覆盖为中转站的 `deepseek-v4.1-flash-1017`，在模型网关上运行 LangGraph 任务流程。可用模型名称以所配置供应商的接口为准。模型节点生成回复或工具调用，设备节点中断等待 Android 回执，收到结果后从 SQLite 检查点继续。langchain-core 用于运行上下文和基础协议，未引入完整 LangChain Agent。
 
 默认监听 `127.0.0.1:8787`，用于本机开发；通过 `AGENT_HOST` 可改为服务器实际持有的私网 IPv4 地址，`AGENT_PORT` 指定端口。当前仅接受回环和 RFC1918 私网监听地址。上游 Base URL、模型和 Key 从本机配置加载，客户端不能覆盖已配置模型，不会自动切换供应商或其他模型。代码默认上游为 `https://api.deepseek.com`；示例配置启用 `https://www.dafangyuntu.com/ai/v1`，费用和额度按实际启用的供应商账户计算。
 
@@ -450,7 +450,7 @@ python -m venv .local/agent-venv
 
 ```dotenv
 AGENT_BASE_URL=https://www.dafangyuntu.com/ai/v1
-AGENT_MODEL=deepseek-v4.1-flash
+AGENT_MODEL=deepseek-v4.1-flash-1017
 AGENT_THINKING=enabled
 # 本地额外分钟配额，0关闭；上游429冷却仍生效
 AGENT_MODEL_RPM=0
