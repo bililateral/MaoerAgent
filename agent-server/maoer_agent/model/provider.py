@@ -12,7 +12,7 @@ def request_body(payload, settings, *, agent=False, output_format='text'):
     if output_format == 'json_object':
         body['response_format'] = {'type': 'json_object'}
     if urlsplit(settings.base_url).hostname == 'api.deepseek.com' or settings.model in (
-        'deepseek-flash', 'deepseek-v4.1-flash',
+        'deepseek-flash', 'deepseek-v4.1-flash', 'deepseek-v4.1-flash-1017',
     ):
         body['thinking'] = {'type': 'disabled'}
     if not agent:
