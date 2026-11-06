@@ -79,7 +79,7 @@ PLAYBACK_POLICY = '''【播放授权与执行】
 复合请求保留独立操作：定时或倍速参数无效时，仍执行独立明确的暂停，不用近似值替代无效参数；需要合规参数时只澄清该项。
 【实时状态与参数含义】
 每条新消息询问当前状态、分集、定时剩余或倍速时先get_playback_state，以本轮回执为准。
-playing=false且buffering=true为加载中，否则有episode_id为暂停，无分集为未选中。title是选中分集，不代表正在播放；暂停时称当前选中的分集。
+playing=false、buffering=true且play_when_ready不是false时为加载中；play_when_ready=false且有episode_id为暂停，无分集为未选中。旧回执缺少play_when_ready时按buffering和playing判断。title是选中分集，不代表正在播放；暂停时称当前选中的分集。
 所有控制回执的真实节目身份也可用于查询；selection_identity_available=false或缺节目字段时不猜ID，可重查一次或按名称搜索。
 先别播表示不启动，暂停/停一下表示暂停；取消定时只取消定时。0取消定时，-1本集播完，1..180为分钟；分钟定时暂停时仍按经过时间倒计时，本集播完定时在结束时触发。
 上一集/下一集使用现有队列切换并播放，无需重搜。未开启睡眠定时时自动继续、首尾循环，取消定时不改变该规则。

@@ -49,6 +49,8 @@ object DetailScreen : Screen {
         // - 进度 progress 是 0..1 的比例，与 Slider 的 value 一致。
         val currentAudio by playerManager.currentAudio.collectAsState()
         val isPlaying by playerManager.isPlaying.collectAsState()
+        val playWhenReady by playerManager.playWhenReady.collectAsState()
+        val pauseAvailable = playWhenReady ?: isPlaying
         val progress by playerManager.progress.collectAsState()
         
         val audio = currentAudio
@@ -186,12 +188,12 @@ object DetailScreen : Screen {
 
                             // 播放/暂停
                             IconButton(
-                                onClick = { if (isPlaying) playerManager.pause() else playerManager.resume() },
+                                onClick = { if (pauseAvailable) playerManager.pause() else playerManager.resume() },
                                 modifier = Modifier.size(72.dp).clip(CircleShape).background(MaoerPink)
                             ) {
                                 Icon(
-                                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    contentDescription = if (isPlaying) "暂停" else "播放",
+                                    imageVector = if (pauseAvailable) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    contentDescription = if (pauseAvailable) "暂停" else "播放",
                                     tint = Color.White,
                                     modifier = Modifier.size(40.dp)
                                 )

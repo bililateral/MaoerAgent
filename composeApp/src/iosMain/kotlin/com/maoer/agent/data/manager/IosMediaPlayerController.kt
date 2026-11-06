@@ -23,6 +23,7 @@ class IosMediaPlayerController : MediaPlayerController {
     override fun seekToMs(position: Long) { positionMs.value = position }
     private val _isPlaying = MutableStateFlow(false)
     override val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
+    override val playWhenReady: StateFlow<Boolean?> = isPlaying
 
     private val _currentProgress = MutableStateFlow(0f)
     override val currentProgress: StateFlow<Float> = _currentProgress.asStateFlow()

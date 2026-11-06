@@ -36,11 +36,13 @@ fun NowPlayingBar() {
     val manager = koinInject<PlayerManager>()
     val audio by manager.currentAudio.collectAsState()
     val playing by manager.isPlaying.collectAsState()
+    val playWhenReady by manager.playWhenReady.collectAsState()
     val progress by manager.progress.collectAsState()
     val navigator = LocalNavigator.current
     audio?.let {
-        BottomPlayerBar(it, playing, progress,
-            { if (playing) manager.pause() else manager.resume() },
+        val pauseAvailable = playWhenReady ?: playing
+        BottomPlayerBar(it, pauseAvailable, progress,
+            { if (pauseAvailable) manager.pause() else manager.resume() },
             { manager.next() }, { manager.previous() }, { navigator?.push(DetailScreen) })
     }
 }

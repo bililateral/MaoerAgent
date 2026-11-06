@@ -90,6 +90,8 @@ class AndroidMediaPlayerController(private val downloads: Downloads) : MediaPlay
 
     private val _isPlaying = MutableStateFlow(false)
     override val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
+    private val _playWhenReady = MutableStateFlow<Boolean?>(null)
+    override val playWhenReady = _playWhenReady.asStateFlow()
 
     private val _currentProgress = MutableStateFlow(0f)
     override val currentProgress: StateFlow<Float> = _currentProgress.asStateFlow()
@@ -118,6 +120,7 @@ class AndroidMediaPlayerController(private val downloads: Downloads) : MediaPlay
         mediaControllerFuture = MediaController.Builder(context, sessionToken)
             .setListener(object : MediaController.Listener {
                 override fun onExtrasChanged(controller: MediaController, extras: Bundle) { updateSleepTimer(extras) }
+                override fun onDisconnected(controller: MediaController) { _playWhenReady.value = null }
             }).buildAsync()
         mediaControllerFuture?.addListener({
             try {
@@ -149,11 +152,15 @@ class AndroidMediaPlayerController(private val downloads: Downloads) : MediaPlay
         
         // 初始化状态
         _isPlaying.value = controller.isPlaying
+        _playWhenReady.value = controller.playWhenReady
         _currentAudioId.value = controller.currentMediaItem?.mediaId
         _playbackSpeed.value = controller.playbackParameters.speed
         updateSleepTimer(controller.sessionExtras)
         
         controller.addListener(object : Player.Listener {
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                _playWhenReady.value = playWhenReady
+            }
             override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
                 _playbackSpeed.value = playbackParameters.speed
             }

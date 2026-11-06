@@ -30,8 +30,8 @@ internal class PlaybackToolHandler(private val repository: PodcastRepository, pr
             }
             "pause_playback" -> {
                 require(args.isEmpty()); player.pause()
-                withTimeoutOrNull(3000) { player.isPlaying.first { !it } }
-                val paused = !player.isPlaying.value
+                withTimeoutOrNull(3000) { player.playWhenReady.first { it == false } }
+                val paused = player.playWhenReady.value == false && !player.isPlaying.value
                 state(if (paused) "ok" else "accepted", if (paused) "已确认播放暂停。" else "暂停请求已发送，等待播放器确认。")
             }
             "resume_playback" -> {

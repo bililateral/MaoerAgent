@@ -15,6 +15,8 @@ interface MediaPlayerController {
     val playbackError: StateFlow<String?>
     fun seekToMs(position: Long)
     val isPlaying: StateFlow<Boolean>
+    /** Actual player intent; null until the controller has an observation. */
+    val playWhenReady: StateFlow<Boolean?>
     /**
      * 当前播放进度（0.0..1.0）。
      *

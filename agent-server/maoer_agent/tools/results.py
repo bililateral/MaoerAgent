@@ -71,6 +71,7 @@ class Result(BaseModel):
     status: Literal['ok', 'accepted', 'unknown', 'error']
     items: list[Item] | None = Field(default=None, max_length=8)
     playing: bool | None = None
+    play_when_ready: bool | None = None
     buffering: bool | None = None
     episode_id: str | None = None
     playback_speed: float | None = None
@@ -104,7 +105,7 @@ def checked_result(call, raw):
                         raise ValueError('unobserved_playback')
                     if call['name'] == 'play_episode' and parsed.episode_id != args['episode_id']:
                         raise ValueError('wrong_episode')
-                if call['name'] == 'pause_playback' and parsed.playing:
+                if call['name'] == 'pause_playback' and (parsed.playing or parsed.play_when_ready is True):
                     raise ValueError('unobserved_pause')
                 if call['name'] == 'set_playback_speed' and parsed.playback_speed != args['speed']:
                     raise ValueError('unobserved_speed')

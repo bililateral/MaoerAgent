@@ -15,9 +15,10 @@ internal class PlaybackStateReader(private val repository: PodcastRepository, pr
         val source = repository.sources.firstOrNull { it.id == selected?.podcastId }
         put("status", status); put("note", note)
         put("playing", player.isPlaying.value); put("buffering", player.buffering.value)
+        put("play_when_ready", player.playWhenReady.value)
         put("playback_state", when {
             player.isPlaying.value -> "playing"
-            player.buffering.value -> "buffering"
+            player.buffering.value && player.playWhenReady.value != false -> "buffering"
             player.playbackAudioId.value != null -> "paused"
             else -> "idle"
         })
