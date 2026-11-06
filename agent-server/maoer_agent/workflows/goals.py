@@ -93,6 +93,8 @@ def reconcile(route,previous,bindings,messages,control_blocked=False):
             result=linked[-1][3];status=result.get('status','unknown')
             p['status']={'ok':'satisfied','error':'failed','unknown':'unknown','accepted':'unknown',
                          'confirmation_required':'waiting_user'}.get(status,'unknown')
+            if goal['kind']=='control' and not matches_call(goal,linked[-1][2]):
+                p.update(status='failed',reason='实际调用参数不符合本项目标')
         elif goal['kind'] in QUERY_KINDS and linked:
             if set(p['call_ids'])-set(p.get('reviewed_calls',[])):p['status']='observed'
             if episode_description_required(route,goal) and p['status']=='satisfied' and not description_items(messages,p['call_ids']):
@@ -134,6 +136,12 @@ def matches(goal,name):
         or (goal['kind']=='catalog_query' and spec.scope=='podcast')
         or (goal['kind']=='library_query' and name=='query_library')
         or (goal['kind']=='general' and not spec.changes_state and spec.scope in {'web','podcast','library'}))
+
+
+def matches_call(goal,call):
+    """A requested effect includes its explicit parameters, not just its name."""
+    return matches(goal,call['name']) and (goal['kind']!='control' or all(
+        call['arguments'].get(key)==value for key,value in goal.get('arguments',{}).items()))
 
 
 def evidence_matches(goal,name,route):
@@ -223,11 +231,11 @@ def scope(route,progress,available,allowed):
 def bind(route,progress,previous,calls,messages=()):
     bindings=dict(previous);assigned=set()
     for call in calls:
-        bound=next((g for g in goals(route) if g['id']==previous.get(call['id']) and matches(g,call['name'])
+        bound=next((g for g in goals(route) if g['id']==previous.get(call['id']) and matches_call(g,call)
                     and ready(g,progress) and progress.get(g['id'],{}).get('status') not in TERMINAL),None)
         if bound:
             bindings[call['id']]=bound['id'];assigned.add(bound['id']);continue
-        choices=[g for g in goals(route) if matches(g,call['name']) and ready(g,progress)
+        choices=[g for g in goals(route) if matches_call(g,call) and ready(g,progress)
                  and (not TOOLS[call['name']].changes_state or progress.get(g['id'],{}).get('status','pending') not in TERMINAL)
                  and (g['kind']!='control' or g['id'] not in assigned)]
         choices.sort(key=lambda g:(progress.get(g['id'],{}).get('status') in TERMINAL,g['kind']=='general'))

@@ -530,6 +530,12 @@ class AgentGraph:
                     'status': 'error', 'executed': False, 'code': 'tool_not_allowed', 'note': error_message('tool_not_allowed')}}))
                 continue
             if remaining is not None and TOOLS[call['name']].changes_state:
+                if plan and not any(task_goals.matches_call(g,call) and task_goals.ready(g,progress)
+                        and progress.get(g['id'],{}).get('status') not in task_goals.TERMINAL for g in plan):
+                    deferred.append(self.record_result(run_id, {'call_id':call['id'],'result':{
+                        'status':'error','executed':False,'code':'control_not_requested',
+                        'note':'本次调用的操作或参数不符合尚待执行的目标。'}}))
+                    continue
                 if remaining[call['name']] <= 0:
                     deferred.append(self.record_result(run_id, {'call_id': call['id'], 'result': {
                         'status': 'error', 'executed': False, 'code': 'control_not_requested',
