@@ -2,6 +2,7 @@
 from maoer_agent.contracts.intent import web_delivery, web_source_links
 import asyncio
 import json
+import hashlib
 import time
 from datetime import datetime,timezone,timedelta
 from dataclasses import replace
@@ -406,7 +407,16 @@ class AgentGraph:
         plan=task_goals.goals(state.get('route',{}))
         quote_selected=(state.get('route',{}).get('page_lookup',{}).get('target_kind')=='evidence_quote'
                         and not view['next_step'] and bool(self.answer_input(state,[],True).sources))
-        if (direct and direct['kind']=='control_receipts' and direct.get('receipts')
+        planned=task_goals.planned_control(state.get('route',{}),progress,names) if not final_only else None
+        if planned:
+            identity='plan_'+hashlib.sha256((run_id+':'+planned['goal_id']).encode()).hexdigest()[:32]
+            message={'role':'assistant','content':None,'tool_calls':[{'id':identity,'type':'function',
+                'function':{'name':planned['name'],'arguments':json.dumps(planned['arguments'],ensure_ascii=False)}}]}
+            messages=state['messages']
+            dispatches=dict(self.get_run(run_id).get('plan_dispatches',{}))
+            dispatches[identity]=planned['goal_id']
+            self.store.update(run_id,plan_dispatches=dispatches)
+        elif (direct and direct['kind']=='control_receipts' and direct.get('receipts')
                 and not view['next_step']):
             message={'role':'assistant','content':self.query_renderer(direct)}
             messages=state['messages']

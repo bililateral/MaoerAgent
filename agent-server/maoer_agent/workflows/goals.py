@@ -144,6 +144,24 @@ def matches_call(goal,call):
         call['arguments'].get(key)==value for key,value in goal.get('arguments',{}).items()))
 
 
+def planned_control(route,progress,names):
+    """Dispatch a fully specified, ready intent once through the normal ledger.
+
+    Episode selection still needs the model and the identity/confirmation path.
+    Relative settings with missing parameters still need a state observation.
+    """
+    for goal in goals(route):
+        p=progress.get(goal['id'],{})
+        name=goal.get('action','')
+        if (goal['kind']!='control' or name=='play_episode' or name not in names
+                or p.get('status','pending')!='pending' or p.get('call_ids') or not ready(goal,progress)):
+            continue
+        if parameter_state(goal)=='supported':
+            return {'goal_id':goal['id'],'name':name,
+                    'arguments':TOOLS[name].input_model.model_validate(goal.get('arguments',{})).model_dump()}
+    return None
+
+
 def evidence_matches(goal,name,route):
     if goal['kind']=='general':
         scopes={scope for flag,scope in (('web','web'),('podcast','podcast'),('library','library')) if route.get(flag)}
