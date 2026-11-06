@@ -132,21 +132,28 @@ class RssResearch:
 
     async def load(self, source, force=False, diagnostics=None):
         fetched, rows = self.store.feed(source['id'])
-        if not force and rows and all('duration_seconds' in r and r.get('identity_version') == FEED_IDENTITY_VERSION for r in rows) and time.time() - fetched < 3600:
+        compatible=fetched>0 and all('duration_seconds' in r and r.get('identity_version') == FEED_IDENTITY_VERSION for r in rows)
+        if not force and compatible and time.time() - fetched < 3600:
             return fetched, rows
+        validators=self.store.feed_headers(source['id']) if compatible else {}
         async with self.slots:
             try:
                 async with self.client.stream('GET', source['feed_url'], follow_redirects=True,
                                               headers={'Accept': 'application/rss+xml, application/xml, */*',
-                                                       'User-Agent': 'MaoerAgent/0.3 RSS'}, timeout=15) as response:
-                    response.raise_for_status()
-                    raw = bytearray()
-                    async for block in response.aiter_bytes():
-                        raw.extend(block)
-                        if len(raw) > 8_000_000: raise ValueError('rss_too_large')
-                updated = await asyncio.to_thread(parse_feed, bytes(raw), source)
+                                                       'User-Agent': 'MaoerAgent/0.3 RSS', **validators}, timeout=15) as response:
+                    if response.status_code==304 and compatible:
+                        updated=rows
+                    else:
+                        response.raise_for_status()
+                        raw = bytearray()
+                        async for block in response.aiter_bytes():
+                            raw.extend(block)
+                            if len(raw) > 8_000_000: raise ValueError('rss_too_large')
+                        updated = await asyncio.to_thread(parse_feed, bytes(raw), source)
+                    etag=response.headers.get('ETag',validators.get('If-None-Match','') if response.status_code==304 else '')
+                    modified=response.headers.get('Last-Modified',validators.get('If-Modified-Since','') if response.status_code==304 else '')
                 updated_at = int(time.time())
-                self.store.save_feed(source['id'], updated_at, updated)
+                self.store.save_feed(source['id'], updated_at, updated, etag=etag, modified=modified)
                 fetched, rows = updated_at, updated
             except Exception as exc:
                 # Preserve a real last-successful timestamp; never call it fresh.

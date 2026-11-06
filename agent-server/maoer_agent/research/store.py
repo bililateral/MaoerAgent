@@ -25,6 +25,11 @@ class ResearchStore:
             CREATE TABLE IF NOT EXISTS research_state_scopes(scope TEXT, state_id TEXT, PRIMARY KEY(scope,state_id));
             CREATE INDEX IF NOT EXISTS research_state_scope_keys ON research_state_scopes(state_id);
         ''')
+        # Existing feed bodies and the public feed() tuple keep their format.
+        columns={row[1] for row in self.db.execute('PRAGMA table_info(feeds)')}
+        for column in ('etag','modified'):
+            if column not in columns:self.db.execute(f'ALTER TABLE feeds ADD COLUMN {column} TEXT')
+        self.db.commit()
 
     def document(self, text):
         key = digest(text)
@@ -42,9 +47,15 @@ class ResearchStore:
             row = self.db.execute('SELECT fetched,body FROM feeds WHERE id=?', (key,)).fetchone()
             return (row[0], json.loads(row[1])) if row else (0, [])
 
-    def save_feed(self, key, fetched, rows):
+    def feed_headers(self, key):
+        with self.lock:
+            row=self.db.execute('SELECT etag,modified FROM feeds WHERE id=?',(key,)).fetchone()
+            return {header:value for header,value in zip(('If-None-Match','If-Modified-Since'),row or ('','')) if value}
+
+    def save_feed(self, key, fetched, rows, *, etag='', modified=''):
         with self.lock, self.db:
-            self.db.execute('INSERT OR REPLACE INTO feeds VALUES(?,?,?)', (key, fetched, json.dumps(rows, ensure_ascii=False)))
+            self.db.execute('INSERT OR REPLACE INTO feeds(id,fetched,body,etag,modified) VALUES(?,?,?,?,?)',
+                            (key, fetched, json.dumps(rows, ensure_ascii=False), etag, modified))
 
     def vectors(self, keys):
         with self.lock:
