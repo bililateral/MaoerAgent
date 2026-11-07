@@ -144,7 +144,7 @@ def remember(memory, run_id, calls, results):
             if kind == 'episode' and args.get('podcast_id') and any(item['podcast_id'] != args['podcast_id'] for item in items):
                 continue
             group = {'source': source, 'turn': value['turn'], 'tool': name,
-                     'query': args.get('query') or ' '.join(args.get('keywords', [])), 'items': items}
+                     'query': args.get('query', ''), 'items': items}
             if kind == 'episode':
                 group['podcast_id'] = args.get('podcast_id', '')
                 if name == 'list_episodes':
