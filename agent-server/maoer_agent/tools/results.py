@@ -86,7 +86,7 @@ class RssSearchResult(Result):
 
 
 def checked_result(call, raw):
-    """Accept legacy optional fields; a malformed success never authorizes more controls."""
+    """Validate current receipts; a malformed success never authorizes more controls."""
     try:
         result_type = RssSearchResult if call['name'] == 'search_rss' else Result
         parsed = result_type.model_validate(raw)
@@ -97,7 +97,7 @@ def checked_result(call, raw):
             raise ValueError('invalid_end_offset')
         if parsed.status == 'ok':
             if spec.result_kind == 'playback':
-                if parsed.playing is None:
+                if parsed.playing is None or parsed.play_when_ready is None:
                     raise ValueError('missing_playing')
                 args = call['arguments']
                 if call['name'] in ('play_episode', 'resume_playback', 'previous_episode', 'next_episode'):
@@ -134,7 +134,7 @@ def checked_result(call, raw):
                 if parsed.has_more is True and call['name'] in ('search_rss', 'list_episodes', 'read_web_page', 'read_episode_description', 'query_library', 'list_recent_updates'):
                     if parsed.next_offset is None or parsed.next_offset <= call['arguments'].get('offset', 0):
                         raise ValueError('invalid_page')
-        # Don't inject defaults or coerce legacy values. Raw JSON stays immutable.
+        # Don't inject defaults or coerce receipt values. Raw JSON stays immutable.
         return deepcopy(raw)
     except (ValidationError, ValueError, KeyError, TypeError):
         return {'status': 'unknown', 'code': 'tool_result_unverified',

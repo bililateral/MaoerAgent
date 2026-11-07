@@ -29,6 +29,7 @@ actual fun protectAgentConnection(value: String): String {
 }
 
 actual fun unprotectAgentConnection(value: String): String {
+    require(value.startsWith("enc:v1:"))
     val bytes = Base64.decode(value.removePrefix("enc:v1:"), Base64.NO_WRAP)
     require(bytes.size > 28)
     val cipher = Cipher.getInstance("AES/GCM/NoPadding")

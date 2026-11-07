@@ -20,7 +20,7 @@ internal fun agentCatalogSummary(feed: PodcastFeed): JsonObject {
     }
     val unrecognized = feed.episodes.filter { agentEpisodeNumber(it.title) == null }
     val duplicates = counts.filterValues { it > 1 }
-    // Count actual full-list title forms, independently of the legacy positive
+    // Count actual full-list title forms, independently of the positive
     // integer selector. Unrecognized integers are NOT all season/episode titles.
     val seasonEpisode = Regex("^S\\s*\\d+\\s*E\\s*\\d+(?=\\D|$)", RegexOption.IGNORE_CASE)
     val zeroEpisode = Regex("^(?:ep[\\s.．:：\\-–—]*0|第\\s*0\\s*[期集回])(?=\\D|$)", RegexOption.IGNORE_CASE)

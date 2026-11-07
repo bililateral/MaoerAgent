@@ -164,7 +164,7 @@ def remember(memory, run_id, calls, results):
 
 
 def replay_references(memory, run_id, messages):
-    """Upgrade old completed records/checkpoints using paired, real tool messages."""
+    """Rebuild bounded references from actual paired tool messages."""
     calls = {}
     for message in messages:
         for call in message.get('tool_calls') or []:

@@ -94,9 +94,7 @@ def parse_feed(raw, source):
         published = (item.findtext('pubDate') or '').strip()
         guid = (item.findtext('guid') or '').strip()
         identity = guid or (f'{identity_title(raw_name)}|{published}' if published else audio)
-        legacy_identity = guid or (f'{name}|{published}' if published else audio)
         episode_id = source['id'] + ':' + digest(identity)
-        legacy_id = source['id'] + ':' + digest(legacy_identity)
         body = ''
         for field in (CONTENT, 'description'):
             description = item.find(field)
@@ -107,7 +105,6 @@ def parse_feed(raw, source):
         link = (item.findtext('link') or '').strip()
         result.append({'kind': 'episode', 'id': episode_id, 'podcast_id': source['id'],
                        'identity_version': FEED_IDENTITY_VERSION,
-                       'id_aliases': [legacy_id] if legacy_id != episode_id else [],
                        'title': name[:300], 'podcast_title': title[:150], 'published': published[:150],
                        'source_url': source['feed_url'], 'original_url': link if urlsplit(link).scheme in ('http', 'https') else '',
                        'duration_seconds': duration_seconds(item.findtext(ITUNES_DURATION) or ''),
@@ -400,19 +397,11 @@ class RssResearch:
         fetched, rows = await self.load(source, diagnostics=failures)
         if not rows and failures: return {'status': 'error', **failures[podcast_id]}
         row = next((r for r in rows if r['id'] == episode_id), None)
-        if row is None:
-            aliases = [r for r in rows if episode_id in r.get('id_aliases', [])]
-            if len(aliases) > 1:
-                return {'status': 'error', 'code': 'rss_episode_ambiguous', 'note': error_message('rss_episode_ambiguous')}
-            row = aliases[0] if aliases else None
         if not row: return {'status': 'error', 'code': 'rss_episode_missing', 'note': error_message('rss_episode_missing')}
         body = row['description']
         excerpt = body[offset:offset + 4000]
         more = offset + len(excerpt) < len(body)
-        # Retain the requested reference ID so existing citations and the tool
-        # result contract still identify the same observed episode.
-        item = self.evidence({**row, 'id': episode_id}, excerpt, offset, fetched)
-        if row['id'] != episode_id: item['canonical_id'] = row['id']
+        item = self.evidence(row, excerpt, offset, fetched)
         return {'status': 'ok', 'items': [item], 'failures': failures, 'has_more': more,
                 'next_offset': offset + len(excerpt), 'total_characters': len(body),
                 'note': '分集RSS说明。' + ('源文本超过读取上限，完整性未保证。' if row['description_truncated'] else '')}

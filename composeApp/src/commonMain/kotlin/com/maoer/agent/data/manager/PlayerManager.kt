@@ -50,12 +50,6 @@ class PlayerManager(private val storage: KeyValueStorage, private val mediaContr
                 val audio = saved.queue.find { it.id == saved.currentId }?.let { enrich(it) }
                 if (audio != null) {
                     if (userSelected) return@launch
-                    // Older installs only have the last queue snapshot. Preserve that progress once.
-                    // Timestamp 1 means historical time unknown; don't pretend restoration is a new listen.
-                    optional {
-                        if (saved.positionMs > 0 && library.entry(audio.id) == null)
-                            library.record(audio, saved.positionMs, 0, 1)
-                    }
                     playlist = saved.queue.map { if (it.id == audio.id) audio else it }
                     _queue.value = playlist
                     mediaController.setPlaylist(playlist)

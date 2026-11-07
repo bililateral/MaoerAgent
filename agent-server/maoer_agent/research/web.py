@@ -98,8 +98,7 @@ class WebResearch:
                 self.monitor_usage(cache_key, headers)
                 now = time.time()
                 cooldown = self.store.state(cache_key + ':cooldown')
-                # Migrate old usage-induced cooldowns without weakening real search limits.
-                if cooldown.get('phase') != 'usage' and cooldown.get('until', 0) > now:
+                if cooldown.get('until', 0) > now:
                     delay = math.ceil(cooldown['until'] - now)
                     return {'status': 'error', 'code': 'web_rate_limited', 'phase': cooldown.get('phase', endpoint),
                             'retry_after': delay, 'note': error_message('web_rate_limited', seconds=delay)}

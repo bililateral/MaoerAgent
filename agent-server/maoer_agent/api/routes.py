@@ -18,7 +18,7 @@ class NewRun(StrictModel):
     id: str = Field(pattern=r'^[a-f0-9-]{36}$')
     conversation_id: str = Field(pattern=r'^[a-f0-9-]{36}$')
     message: str = Field(min_length=1, max_length=2000)
-    capabilities: list[str] = Field(default_factory=list, max_length=8)
+    personalized_search: bool = False
 
 
 def register(app, settings):

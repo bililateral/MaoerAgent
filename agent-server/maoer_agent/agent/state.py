@@ -1,4 +1,4 @@
-"""Shared task/checkpoint contract; existing records and budgets stay compatible."""
+"""Shared task/checkpoint contract; current protocol and durable execution budgets."""
 from typing import TypedDict
 
 TERMINAL = {'completed', 'cancelled', 'failed'}
@@ -19,9 +19,7 @@ class State(TypedDict):
     summary_pending: int
     summary_covered: list[str]
     history_turn_ids: list[str]
-    extended_episodes: bool
     deferred_results: list[dict]
-    research: bool
     route: dict
     research_plan: list[dict]
     route_rechecked: bool

@@ -12,7 +12,6 @@ from maoer_agent.research.store import ResearchStore
 from maoer_agent.research.rss import RssResearch, CATALOG
 from maoer_agent.research.web import WebResearch
 from maoer_agent.research.tools import ResearchTools
-from maoer_agent.research.updates import restore_snapshot_scopes
 from maoer_agent.application.sources import SourceQueries
 from maoer_agent.application.replies import page_reply, query_reply
 
@@ -26,12 +25,8 @@ async def task_service(settings, client, gate, path):
         storage.callback(store.close)
         knowledge = ResearchStore(path.parent / 'research.sqlite3')
         storage.callback(knowledge.close)
-        references = {}
-        for run in store.runs():
-            snapshots = references.setdefault(run['conversation_id'], set())
-            results = [r['result'] for r in run.get('results', [])] + list(run.get('raw_results', {}).values())
-            snapshots.update(r['query_snapshot'] for r in results if r.get('query_snapshot'))
-        restore_snapshot_scopes(knowledge, references)
+        for scope in knowledge.state_scopes() - set(store.conversations()):
+            knowledge.release_scope(scope)
         async with AsyncExitStack() as services:
             rss = RssResearch(knowledge, client, LocalEmbeddings(path.parent / 'embedding-model'),
                               ModelRelevanceJudge(settings.model, settings.context_budget_bytes))

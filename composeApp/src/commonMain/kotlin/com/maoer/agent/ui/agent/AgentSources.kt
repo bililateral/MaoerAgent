@@ -24,12 +24,7 @@ import kotlinx.serialization.json.*
 
 internal fun JsonObject.text(key: String) = this[key]?.jsonPrimitive?.content.orEmpty()
 
-internal fun visibleSources(run: AgentRun): List<JsonObject> = run.sources.ifEmpty {
-    // Legacy conversations remain readable without fabricating a server citation binding.
-    run.results.flatMap { receipt -> (receipt.result["items"] as? JsonArray).orEmpty().map { it.jsonObject } }
-        .filter { it.text("evidence").isNotBlank() }
-        .distinctBy { it.text("id") + it.text("source_url") + it.text("evidence") }
-}
+internal fun visibleSources(run: AgentRun): List<JsonObject> = run.sources
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

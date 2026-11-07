@@ -37,10 +37,9 @@ class AgentStorage {
     }
     suspend fun connection(): AgentConnection {
         val text = read("connection.json") ?: return AgentConnection()
-        val connection = try { json.decodeFromString<AgentConnection>(if (text.startsWith("enc:v1:")) unprotectAgentConnection(text) else text) }
+        val connection = try { json.decodeFromString<AgentConnection>(unprotectAgentConnection(text)) }
             catch (e: CancellationException) { throw e }
             catch (_: Exception) { throw AppFailure("local_credentials_failed") }
-        if (!text.startsWith("enc:v1:")) saveConnection(connection)
         return connection
     }
     suspend fun saveConnection(value: AgentConnection) {
@@ -49,7 +48,8 @@ class AgentStorage {
             catch (_: Exception) { throw AppFailure("local_credentials_failed") }
         write("connection.json", protected)
     }
-    suspend fun history() = try { read("history.json")?.let { json.decodeFromString<AgentHistory>(it) } ?: AgentHistory() }
+    suspend fun history() = try { read("history.json")?.let { json.decodeFromString<AgentHistory>(it) }
+        ?: AgentHistory(starterQuestions = agentStarterQuestions()).also { saveHistory(it) } }
         catch (_: SerializationException) { throw AppFailure("local_agent_record_invalid") }
     suspend fun saveHistory(value: AgentHistory) = write("history.json", json.encodeToString(value))
     suspend fun personalizedSearch() = read("personalized-search.txt") != "false"
@@ -64,9 +64,7 @@ class AgentStorage {
             if (!fs.exists(root)) return@withLock
             fs.list(root).filter { Regex("execution-[a-f0-9]{64}\\.json").matches(it.name) }.forEach { path ->
                 val value = json.decodeFromString<AgentExecution>(fs.read(path) { readUtf8() })
-                // Legacy receipts predate ownership; this app has only one live conversation.
-                // They belong to this or already closed conversations, never a future task.
-                if (value.conversationId.isEmpty() || value.conversationId == conversationId) fs.delete(path)
+                if (value.conversationId == conversationId) fs.delete(path)
             }
         } } catch (e: CancellationException) { throw e }
         catch (_: SerializationException) { throw AppFailure("local_agent_record_invalid") }

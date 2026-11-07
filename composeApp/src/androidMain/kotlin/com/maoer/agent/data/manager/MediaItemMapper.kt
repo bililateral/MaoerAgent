@@ -6,7 +6,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import com.maoer.agent.data.model.Audio
 
-/** Keep queue enrichment and the legacy standalone fallback wire formats unchanged. */
+/** Media metadata for queued items; standalone playback uses the same current Audio model. */
 internal fun Audio.toQueueMediaItem(playbackUri: String): MediaItem {
     val metadata = MediaMetadata.Builder()
         .setTitle(title)

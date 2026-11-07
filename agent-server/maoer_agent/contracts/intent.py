@@ -32,17 +32,12 @@ class WebDelivery(BaseModel):
 class WebLookup(BaseModel):
     model_config = ConfigDict(strict=True, extra='forbid')
     query: str = Field(default='', max_length=300)
-    delivery: Literal['answer', 'results'] = 'answer'
-    requirements: WebDelivery | None = None
+    requirements: WebDelivery = Field(default_factory=WebDelivery)
 
 
 def web_requirements(route):
     lookup = route.get('web_lookup', {})
-    if lookup.get('requirements') is not None:
-        return lookup['requirements']
-    # Existing checkpoints predate the independent delivery dimensions.
-    results = lookup.get('delivery') == 'results'
-    return {'factual_answer': not results, 'source_links': results, 'results_only': results}
+    return lookup.get('requirements', {'factual_answer': True, 'source_links': False, 'results_only': False})
 
 
 def web_delivery(route):

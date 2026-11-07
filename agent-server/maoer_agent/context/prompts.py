@@ -65,7 +65,7 @@ CATALOG_POLICY = '''【节目定位与推荐】
 
 RSS_STATISTICS_POLICY = '''【目录统计与内容筛选】
 总集数与最大期号不同，先get_podcast_details读取catalog_summary全表统计并核对用户编号，再解释已证实缺号、未识别标题、重复或解析筛除。依据称“完整RSS目录的标题及解析计数”，不混称节目简介，也不逐页读完整目录消耗预算。
-title_formats按全表计数，examples只是例子；缺字段不能用unrecognized_title_number_items反推季集数量。该字段与旧unnumbered_items均表示未识别单一数字期号；S9E9按原文query查询，不转换为单一数字。numbered_items=0表示数字统计不适用；missing_number_ranges仅列1至最高识别编号之间的缺号。catalog_summary缺失时说明无法取得完整统计，不靠前8条或差值编造原因。
+title_formats按全表计数，examples只是例子；缺字段不能用unrecognized_title_number_items反推季集数量。S9E9按原文query查询，不转换为单一数字。numbered_items=0表示数字统计不适用；missing_number_ranges仅列1至最高识别编号之间的缺号。catalog_summary缺失时说明无法取得完整统计，不靠前8条或差值编造原因。
 发布或删集原因需要发布者说明。统计只能证明差异时，围绕具体疑点做至多3个不同的RSS针对性补查；判断命中文案是否真的解释原因，不把无关关键词当声明。资料不足时说明实际核查范围与未知原因，不假装取得已删除资料。
 term_counts只证明已查精确词，不扩大到同义词或未查概念。eligible_descriptions是组合字面条件计数，不是语义分类，少量示例不代表全部。
 全文排除条件须用实际description_checks，未筛选先筛选，不能从片段未见推断全文不含；只报告用户所查范围。'''
@@ -79,7 +79,7 @@ PLAYBACK_POLICY = '''【播放授权与执行】
 复合请求保留独立操作：定时或倍速参数无效时，仍执行独立明确的暂停，不用近似值替代无效参数；需要合规参数时只澄清该项。
 【实时状态与参数含义】
 每条新消息询问当前状态、分集、定时剩余或倍速时先get_playback_state，以本轮回执为准。
-playing=false、buffering=true且play_when_ready不是false时为加载中；play_when_ready=false且有episode_id为暂停，无分集为未选中。旧回执缺少play_when_ready时按buffering和playing判断。title是选中分集，不代表正在播放；暂停时称当前选中的分集。
+playing=false、buffering=true且play_when_ready不是false时为加载中；play_when_ready=false且有episode_id为暂停，无分集为未选中。title是选中分集，不代表正在播放；暂停时称当前选中的分集。
 所有控制回执的真实节目身份也可用于查询；selection_identity_available=false或缺节目字段时不猜ID，可重查一次或按名称搜索。
 先别播表示不启动，暂停/停一下表示暂停；取消定时只取消定时。0取消定时，-1本集播完，1..180为分钟；分钟定时暂停时仍按经过时间倒计时，本集播完定时在结束时触发。
 上一集/下一集使用现有队列切换并播放，无需重搜。未开启睡眠定时时自动继续、首尾循环，取消定时不改变该规则。
@@ -113,9 +113,10 @@ APP_GUIDANCE = '''手动收藏节目：进入节目详情页，点击右上角�
 仅当用户询问下载时说明下载能力，普通播放回复不要附加下载提醒。助手没有执行下载的工具；应用手动下载也受逐节目来源条件限制。不能无条件说“可以到节目页下载”。当前节目是否开放下载以本轮播放状态download_available为准：false表示当前来源未开放，null或字段缺失表示尚未确认。download_available_sources是整个内置目录已开放下载的来源数量；为0时应说明目前目录均未开放下载，不建议用户去找“其他可下载节目”。字段缺失时也不能假定存在其他可下载来源。未知时只能说“可查看节目页是否提供下载入口”，不能承诺入口一定存在，也不能为满足请求更改来源条件。
 '''
 
-def selection_policy(extended):
-    return ('\n本客户端支持分集分页与位置选择。用户说第N集/第一集时用position=N、order=reverse_source，从原始RSS列表末尾往前数，第一集就是原始列表最后一条；不需要日期完整，也不按发布日期重排或匹配标题编号。首次找到后展示真实标题并问一次确认，下一轮确认后使用已展示ID播放，不反复确认。越界或查询失败不自动改查标题期号；明确第N期/标题期号N才用episode_number=N。明确原始列表第N条用source，从最新数用newest；当前页面排序未知时先澄清，不声称看到了页面。只要求查询或展示时不播放，也不强行询问是否播放。'
-        if extended else '\n本客户端仅支持标题查询，不支持完整列表定位或分页。用户说第N集时说明需升级或请给出具体标题，不得以返回的前8条猜测末尾位置。不要传入未定义参数。')
+def selection_policy():
+    return '\n本客户端支持分集分页与位置选择。用户说第N集/第一集时用position=N、order=reverse_source，从原始RSS列表末尾往前数，第一集就是原始列表最后一条；不需要日期完整，也不按发布日期重排或匹配标题编号。首次找到后展示真实标题并问一次确认，下一轮确认后使用已展示ID播放，不反复确认。越界或查询失败不自动改查标题期号；明确第N期/标题期号N才用episode_number=N。明确原始列表第N条用source，从最新数用newest；当前页面排序未知时先澄清，不声称看到了页面。只要求查询或展示时不播放，也不强行询问是否播放。'
+
+
 
 def delivery_contract(route):
     if route.get('control_actions') or route.get('library'):
@@ -169,9 +170,7 @@ FAILURE_EXPLANATION = '''本轮异常收尾要求（执行依据，不是对用�
 用户已要求的只读步骤已获授权，无需再次询问同意。有可读取的已知来源时直接使用工具继续原任务。网页URL必须是本轮工具已返回或用户本条提供的准确地址，不能凭记忆拼接官网路径。没有已知来源时按上述方式结束，不向用户索要本轮已有的链接。
 查询已开始但未取得完整结果时，本轮不重复同一或等价查询，不通过换词、换调用ID绕过；其他已取得的资料或用户已提供的来源仍可使用。额度、认证、限流后的停止要求继续适用。真实目标歧义、扩大范围和新增播放操作仍按原有确认规则处理。'''
 
-PODCAST_METADATA = 'get_podcast_details返回RSS节目简介节选和目录统计，list_episodes返回分集标题、日期、时长等元数据。evidence_truncated=false表示该条文案完整。当前未提供分集说明读取工具时，不支持读取分集说明全文。当前不支持音频转写或音频全文检索。'
-
-def build_system(names, extended=False, research=False, final_only=False, app_guidance=True,
+def build_system(names, final_only=False, app_guidance=True,
                  purpose='application', route=None):
     """Shared core and applicable policies for every answer entry, including resumed tasks."""
     route = route or {}
@@ -188,7 +187,7 @@ def build_system(names, extended=False, research=False, final_only=False, app_gu
     if (purpose != 'introduction' and 'get_podcast_details' in names) or needs.get('retrieval_statistics'):
         sections.append(RSS_STATISTICS_POLICY)
     if 'list_episodes' in names and purpose != 'introduction':
-        sections.append(selection_policy(extended))
+        sections.append(selection_policy())
     if controls or route.get('device') or route.get('control_actions') or (purpose != 'introduction' and names & {'get_playback_state', 'list_episodes'}) or needs.get('control_explanation', 'none') != 'none':
         sections.append(PLAYBACK_POLICY)
     if 'search_rss' in names:
@@ -201,12 +200,9 @@ def build_system(names, extended=False, research=False, final_only=False, app_gu
         sections.append(WEB_POLICY)
     if 'read_episode_description' in names:
         sections.append('分集说明按真实ID读取，每页最多4000字符，has_more时用next_offset续读。')
-    elif not research and 'get_podcast_details' in names:
-        sections.append(PODCAST_METADATA)
     if app_guidance:
         sections.append('【应用界面事实】\n' + APP_GUIDANCE)
-    if research:
-        sections.append('正文使用本轮[数字]引用，资料在折叠区展示，不另列重复清单；每处引用对应支持该句的原文。')
+    sections.append('正文使用本轮[数字]引用，资料在折叠区展示，不另列重复清单；每处引用对应支持该句的原文。')
     sections.append('【当前事实与工具】\n当前可调用工具：' + (', '.join(sorted(names)) or '无') +
                     '\n日期优先使用published_display的北京时间，缺少时保留原始时区。')
     if names:

@@ -68,9 +68,6 @@ class AgentTasks:
     def create(self, request):
         if self.store.deleted(request.conversation_id): raise TaskConflict('conversation_deleted')
         value = request.model_dump()
-        # Preserve idempotency for requests persisted before capability negotiation existed.
-        if not value.get('capabilities'):
-            value.pop('capabilities', None)
         try:
             existing = self.store.get(request.id)
             if existing['input'] != value: raise TaskConflict('request_id_reused')
@@ -80,13 +77,11 @@ class AgentTasks:
         previous = self.store.conversation(request.conversation_id)
         if any(r['status'] not in TERMINAL for r in previous): raise TaskConflict('conversation_busy')
         history, memory, evicted = context(previous)
-        extended = 'episode_selection_v2' in value.get('capabilities', [])
-        messages = [{'role': 'system', 'content': SYSTEM + selection_policy(extended)}] + history + [{'role': 'user', 'content': request.message}]
+        messages = [{'role': 'system', 'content': SYSTEM + selection_policy()}] + history + [{'role': 'user', 'content': request.message}]
         initial = {'run_id': request.id, 'messages': messages, 'rounds': 0, 'calls': [], 'memory': memory,
                    'tool_count': 0, 'final_only': False, 'summary_candidates': [r['id'] for r in evicted],
                    'summary': {}, 'summary_pending': 0, 'summary_covered': [],
-                   'history_turn_ids': [r['id'] for r in previous[len(evicted):]], 'extended_episodes': extended,
-                   'research': 'research_v3' in value.get('capabilities', [])}
+                   'history_turn_ids': [r['id'] for r in previous[len(evicted):]]}
         run = self.store.put({'id': request.id, 'conversation_id': request.conversation_id, 'status': 'generating',
             'text': '', 'calls': [], 'results': [], 'claimed': [], 'receipts': {}, 'error': '', 'retry_after': 0,
             'retry_at': 0, 'version': 0, 'input': value, 'history': [], 'memory': memory, 'created_at': int(time.time()),

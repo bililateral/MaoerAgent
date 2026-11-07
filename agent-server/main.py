@@ -1,4 +1,4 @@
-"""Compatibility entry point: python agent-server/main.py."""
+"""Service launch entry point: python agent-server/main.py."""
 from maoer_agent.__main__ import main
 
 if __name__ == "__main__":

@@ -62,15 +62,8 @@ class AgentApi(
         val code = runCatching { json.parseToJsonElement(body).jsonObject["error"]?.jsonObject?.get("code")?.jsonPrimitive?.content }.getOrNull()
         throw AgentApiException(code ?: "service_http_error", status)
     }
-    suspend fun create(value: AgentNewRun): AgentRun {
-        try { return request("/v1/agent/runs", json.encodeToString(value), true) }
-        catch (e: AgentApiException) {
-            // Old servers reject the capability field before creating a task. Negotiate
-            // once with the same ID; never replay timeouts, auth errors or model failures.
-            if (e.status != 400 || e.code != "invalid_request" || value.capabilities.isEmpty()) throw e
-            return request("/v1/agent/runs", json.encodeToString(value.copy(capabilities = emptyList())), true)
-        }
-    }
+    suspend fun create(value: AgentNewRun): AgentRun =
+        request("/v1/agent/runs", json.encodeToString(value), true)
     suspend fun get(id: String) = request("/v1/agent/runs/$id")
     suspend fun sourceText(id: String, number: Int): AgentSourceText {
         require(number in 1..48)
@@ -85,14 +78,8 @@ class AgentApi(
     suspend fun cancel(id: String) = request("/v1/agent/runs/$id/cancel", post = true)
     suspend fun retry(id: String) = request("/v1/agent/runs/$id/retry", post = true)
     suspend fun claim(id: String, call: String) = request("/v1/agent/runs/$id/claim/${call.encodeURLPathPart()}", post = true)
-    suspend fun results(id: String, values: List<AgentReceipt>): AgentRun {
-        try { return request("/v1/agent/runs/$id/results", json.encodeToString(AgentResults(values)), true) }
-        catch (e: AgentApiException) {
-            // Old servers reject the new metadata before accepting a receipt.
-            if (e.status != 400 || e.code != "invalid_tool_result" || values.none { it.recovered }) throw e
-            return request("/v1/agent/runs/$id/results", json.encodeToString(AgentResults(values.map { it.copy(recovered = false) })), true)
-        }
-    }
+    suspend fun results(id: String, values: List<AgentReceipt>): AgentRun =
+        request("/v1/agent/runs/$id/results", json.encodeToString(AgentResults(values)), true)
     suspend fun deleteConversation(id: String) {
         val connection = connection()
         if (connection.token.isBlank()) throw AppFailure("connection_missing")

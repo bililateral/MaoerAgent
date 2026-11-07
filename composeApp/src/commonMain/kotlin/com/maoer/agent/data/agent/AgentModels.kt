@@ -89,7 +89,7 @@ fun AgentHistory.requireRecoverableConnection(remote: AgentRun?) {
         throw AppFailure("connection_task_missing")
 }
 @Serializable data class AgentNewRun(val id: String, val conversation_id: String, val message: String,
-                                   val capabilities: List<String> = emptyList())
+                                   val personalized_search: Boolean = false)
 @Serializable data class AgentResults(val results: List<AgentReceipt>)
 @Serializable data class AgentExecution(val fingerprint: String, val result: JsonObject? = null,
                                        val conversationId: String = "", val runId: String = "",

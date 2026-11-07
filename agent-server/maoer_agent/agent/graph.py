@@ -13,7 +13,7 @@ from langchain_core.runnables.config import set_config_context
 from maoer_agent.contracts.errors import ModelFailure
 from maoer_agent.core.errors import error_message
 from maoer_agent.tools.definitions import validated_calls
-from maoer_agent.memory.history import last_turn, remember, replay_references
+from maoer_agent.memory.history import last_turn, remember
 from maoer_agent.memory.summary import MAX_BATCHES, SUMMARY_TIMEOUT, batch, build_summary, SummaryFormatError
 from maoer_agent.workflows.selection import episode_selection_question, selection_step, resolved_episode
 from maoer_agent.workflows.planning import prepare_calls, tool_scope
@@ -141,14 +141,13 @@ class AgentGraph:
         self.store.update(run_id, status='generating', summary_turns=len(saved['covered']),
                           summary_pending=len(pending), summary_error=failure, summary_error_details=failure_details)
         extra = {}
-        if state.get('research'):
-            self.store.update(run_id, phase='intent')
-            async def route_model(settings, messages, tools, publish):
-                return await self.invoke_model(run_id, 'intent', settings, messages, tools, publish)
-            conversation_view = self.conversation_input(state, saved['data'], len(pending), saved['covered'])
-            route = await classify(route_model, self.settings, state['messages'], self.catalog if 'search_hints' in self.get_run(run_id)['input'].get('capabilities', []) else [], conversation=conversation_view)
-            extra['route'] = route
-            self.store.update(run_id, search_hint=route['hint'], route=route, sources=[], conversation_context=history_metrics(conversation_view))
+        self.store.update(run_id, phase='intent')
+        async def route_model(settings, messages, tools, publish):
+            return await self.invoke_model(run_id, 'intent', settings, messages, tools, publish)
+        conversation_view = self.conversation_input(state, saved['data'], len(pending), saved['covered'])
+        route = await classify(route_model, self.settings, state['messages'], self.catalog if self.get_run(run_id)['input']['personalized_search'] else [], conversation=conversation_view)
+        extra['route'] = route
+        self.store.update(run_id, search_hint=route['hint'], route=route, sources=[], conversation_context=history_metrics(conversation_view))
         return {'summary': saved['data'], 'summary_pending': len(pending), 'summary_covered': saved['covered'], 'summary_candidates': [], **extra}
 
     def conversation_input(self, state, summary=None, pending=None, covered=None):
@@ -191,13 +190,12 @@ class AgentGraph:
              'business_context':state.get('business_context',{}),
              'execution_results':[r for r in receipt_evidence(last_turn(state['messages']))
                  if r['tool'] in TOOLS and TOOLS[r['tool']].changes_state
-                 and r['call_id'] not in self.get_run(state['run_id']).get('reported_controls',[])]}, available, state.get('extended_episodes', False),
-            state.get('research', False), final_only, self.settings.model,
+                 and r['call_id'] not in self.get_run(state['run_id']).get('reported_controls',[])]}, available, final_only, self.settings.model,
             self.settings.context_budget_bytes, self.settings.agent_thinking, self.conversation_input(state))
 
     def scoped_tools(self,state,final_only):
         run=self.get_run(state['run_id']);route=state.get('route',{})
-        available,allowed=tool_scope(route,run['input'].get('capabilities',[]),state.get('extended_episodes',False),state.get('research',False),final_only)
+        available,allowed=tool_scope(route,final_only)
         available,allowed=recovery_scope(run,route,available,allowed)
         available,allowed=evidence_scope(state['messages'],available,allowed,web_delivery(route))
         return task_goals.scope(route,run.get('goal_progress',{}),available,allowed)
@@ -334,7 +332,7 @@ class AgentGraph:
 
     async def business_context(self,state,names,final_only,progress):
         route=state.get('route',{});messages=state['messages']
-        selected=selection_step(route,messages,names) if state.get('extended_episodes') else None
+        selected=selection_step(route,messages,names)
         result=(literal_listings.completion(route,messages)
                 or library_completion_step(route,messages,progress)
                 or duration_candidates(route,messages)
@@ -351,11 +349,11 @@ class AgentGraph:
             or literal_listings.next_call(route,messages,names)
             or criteria_call(route,messages,names)
             or (selected if selected and selected['kind']!='selection' else None))
-        if state.get('research') and episode_pages.active(route):
+        if episode_pages.active(route):
             page=await self.page_context(state,names,final_only)
             if page['kind']=='answer':result=page
             else:next_step=page
-        if not next_step and not final_only and state.get('research') and not episode_pages.active(route):
+        if not next_step and not final_only and not episode_pages.active(route):
             next_step=(task_goals.missing_query(route,progress,names)
                 or playback_state_step(route,messages,names)
                 or lookup_step(route,messages,names)
@@ -371,27 +369,6 @@ class AgentGraph:
         run_id = state['run_id']
         final_only = state.get('final_only', False) or state.get('tool_count', 0) >= MAX_TOOL_CALLS
         run = self.get_run(run_id)
-        if (run.get('recovered_playback_calls') and not run.get('playback_refresh_pending')
-                and 'control_actions' not in state.get('route', {})):
-            # Upgrade a legacy checkpoint once, retaining its existing route.
-            async def recovery_intent(settings, messages, tools, publish):
-                return await self.invoke_model(run_id, 'recovery_intent', settings, messages, tools, publish)
-            checked = await classify(recovery_intent, self.settings, state['messages'], [], conversation=self.conversation_input(state))
-            route = {**state.get('route', {}), 'control_actions': checked['control_actions']}
-            state = {**state, 'route': route}
-            self.store.update(run_id, route=route)
-        run=self.get_run(run_id)
-        # Older checkpoints did not bind some standalone goals. Reuse only
-        # dispatched calls with actual receipts; never create or replay a call.
-        received={r['call_id'] for r in receipt_evidence(last_turn(state['messages']))}
-        unbound=[c for c in run.get('tool_ledger',[])
-                 if c['id'] in received and c['id'] not in run.get('goal_bindings',{})]
-        if unbound:
-            bindings=task_goals.bind(state.get('route',{}),run.get('goal_progress',{}),
-                run.get('goal_bindings',{}),unbound,state['messages'])
-            if bindings!=run.get('goal_bindings',{}):
-                self.store.update(run_id,goal_bindings=bindings)
-                run=self.get_run(run_id)
         progress=task_goals.reconcile(state.get('route',{}),run.get('goal_progress',{}),run.get('goal_bindings',{}),state['messages'],run.get('control_blocked',False))
         if progress!=run.get('goal_progress',{}):self.store.update(run_id,goal_progress=progress)
         available,allowed=self.scoped_tools(state,final_only)
@@ -426,7 +403,7 @@ class AgentGraph:
         else:
             message,messages=await self.answer_message(state,available,final_only)
         try:
-            calls = validated_calls(message, state.get('extended_episodes', False))
+            calls = validated_calls(message)
         except (ValueError, KeyError, TypeError):
             raise ModelFailure('invalid_tool_call') from None
         if final_only and calls:
@@ -452,12 +429,12 @@ class AgentGraph:
                 'rounds':state['rounds']+1,'calls':[],'research_plan':[],'deferred_results':[],
                 'continue_model':True,'final_only':final_only}
         sources = self.answer_input(state,[],True).sources
-        if (not calls and not quote_selected and state.get('research')
+        if (not calls and not quote_selected
                 and state.get('route',{}).get('page_lookup',{}).get('target_kind')=='evidence_quote'
                 and sources):
             message=await self.quote_reply(state,available)
-            calls=validated_calls(message,state.get('extended_episodes',False))
-        if (not calls and state.get('research')
+            calls=validated_calls(message)
+        if (not calls
                 and (sources or not ordinary_question(state.get('route', {})))
                 and not valid_citations(message.get('content'), sources)):
             # Citation numbers belong to one answer. A model may accidentally
@@ -501,7 +478,7 @@ class AgentGraph:
         route = state.get('route', {})
         route_rechecked = state.get('route_rechecked', False)
         disputed = {c['name'] for c in calls if c['name'] in DEVICE_TOOLS and c['name'] not in allowed}
-        if state.get('research') and disputed and not route_rechecked and not task_goals.goals(route):
+        if disputed and not route_rechecked and not task_goals.goals(route):
             # A route is a lossy model classification, not evidence of authorization.
             # Recheck once before any effect; never open controls on a failed recheck.
             route_rechecked = True
@@ -610,8 +587,6 @@ class AgentGraph:
             self.store.update(run_id, tool_ledger=list(ledger.values()), phase=call['name'])
             old = run.get('raw_results', {}).get(call['id'])
             if old is None:
-                old = next((r['result'] for r in run['results'] if r['call_id'] == call['id']), None)
-            if old is None:
                 started = list(run.get('research_started', []))
                 checkpoint = run.get('research_checkpoints', {}).get(call['id'])
                 if call['id'] in started and checkpoint is None:
@@ -655,16 +630,13 @@ class AgentGraph:
         results = results + state.get('deferred_results', [])
         calls = {c['id']: c for c in state['calls']}
         results = [self.record_result(state['run_id'], r, calls.get(r['call_id'])) for r in results]
-        memory = state.get('memory')
-        if memory is None:
-            memory = replay_references({'turn': 1, 'groups': []}, state['run_id'], state['messages'])
+        memory = state['memory']
         memory = remember(memory, state['run_id'], state['calls'], results)
         if state.get('research_plan'):
             # A model batch contains independent, already validated arguments.
             # Phone receipts commit first; a slow remote lookup cannot hold an
             # independent pause. Keep the assistant batch open until all tools
-            # have receipts. Old checkpoints with completed research take the
-            # original path below and retain their existing receipt identity.
+            # have receipts before resuming the current research plan.
             return {'calls': [], 'memory': memory, 'deferred_results': results}
         order = [c['id'] for c in state['messages'][-1]['tool_calls']]
         by_id = {r['call_id']: r for r in results}

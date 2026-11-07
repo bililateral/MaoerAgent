@@ -168,32 +168,6 @@ def resolved_episode(route,messages):
     return next(iter(read.values())) if len(read)==1 else None
 
 
-def selection_identity_refresh(messages, calls, known, run_id):
-    """Upgrade a legacy state receipt before using its missing podcast identity.
-
-    No ID is inferred from an episode string. Re-read once, then let the model
-    plan again from the real device result; never repeat an already executed control.
-    """
-    missing = any(c['arguments'].get('podcast_id') and not any(
-        (i.get('kind') == 'podcast' and i.get('id') == c['arguments']['podcast_id']) or
-        (i.get('kind') == 'episode' and i.get('podcast_id') == c['arguments']['podcast_id'])
-        for i in known) for c in calls)
-    if not missing:
-        return None
-    names, latest = {}, None
-    call_id = 'selection_identity_' + run_id
-    for m in last_turn(messages):
-        for c in m.get('tool_calls') or []:
-            names[c['id']] = c['function']['name']
-        if m['role'] == 'tool' and names.get(m['tool_call_id']) in PLAYBACK_SNAPSHOT_TOOLS:
-            latest = json.loads(m['content'])
-    if (call_id in names or not latest or latest.get('status') != 'ok'
-            or not latest.get('episode_id') or 'podcast_id' in latest):
-        return None
-    return {'id': call_id, 'name': 'get_playback_state', 'arguments': {}}
-
-
-
 def playback_preflight(messages, calls, run_id, round_number):
     """Refresh cross-turn playback selections before any control in that model batch.
 

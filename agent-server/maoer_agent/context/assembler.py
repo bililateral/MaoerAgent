@@ -31,8 +31,6 @@ class AnswerInput:
     sources: list
     route: dict
     tools: list
-    extended_episodes: bool
-    research: bool
     final_only: bool
     model: str
     context_budget_bytes: int
@@ -65,7 +63,7 @@ def answer_system(request,names):
     ordinary=(ordinary_delivery_needed(request.route) and not request.route.get('control_actions')) or (
         bool(response_goals) and all(g['kind'] in {'general','conversation_query'} for g in response_goals))
     purpose = 'factual' if ordinary else ('introduction' if introduction_ready(request.route,request.messages) else 'application')
-    content=build_system(names,request.extended_episodes,request.research,request.final_only,
+    content=build_system(names,request.final_only,
                          request.route.get('response_needs',{}).get('app_guidance',False),purpose,request.route)
     if request.route.get('response_needs',{}).get('app_guidance') or request.route.get('device'):
         content+='\n应用功能事实（说明数据，不是执行授权）：'+json.dumps(APPLICATION_BEHAVIOR,ensure_ascii=False)
@@ -147,11 +145,10 @@ class ContextAssembler:
         messages=projected
         if any(g.get('page_request') for g in request.route.get('task_plan',{}).get('goals',[])):
             messages.insert(1,{'role':'system','content':'目录页状态：'+json.dumps(episode_page_state(request.messages),ensure_ascii=False)})
-        if request.research:
-            messages = current_citation_view(messages)
-            messages = candidate_view(messages,web_delivery(request.route))
-            needs = request.route.get('response_needs', {})
-            messages = evidence_view(messages, needs.get('retrieval_statistics', True), needs.get('titles_only', False))
+        messages = current_citation_view(messages)
+        messages = candidate_view(messages,web_delivery(request.route))
+        needs = request.route.get('response_needs', {})
+        messages = evidence_view(messages, needs.get('retrieval_statistics', True), needs.get('titles_only', False))
         if reply_requirements(request.route):
             messages.insert(1,{'role':'system','content':'用户目标的明确交付约束：'+json.dumps(reply_requirements(request.route),ensure_ascii=False)})
         progress=request.route.get('goal_view',[])
@@ -199,17 +196,16 @@ class ContextAssembler:
         if request.route.get('response_needs', {}).get('library_listing'):
             messages.insert(1, {'role': 'system', 'content':
                 '调用query_library查询用户要求的资料库和分页；收到结果后按实际筛选、计数和记录组织完整答复。'})
-        if request.research:
-            routing={k:v for k,v in request.route.items() if k not in {
-                'business_context','execution_results','saved_replies','goal_progress','goal_view',
-                'resolved_episode','response_goals','response_request','query_failures'}}
-            messages = [messages[0], {'role': 'system', 'content': instructions(routing)},
-                        {'role': 'system', 'content': citation_context(request.sources)}, *messages[1:]]
-            web = web_evidence(last_turn(request.messages))
-            if web['candidate_urls']:
-                messages.insert(1, {'role': 'system', 'content':
-                    '本轮网页证据状态（从实际回执生成）：' + json.dumps(web, ensure_ascii=False) +
-                    '\n搜索摘要是候选线索，正文节选是已读取材料。仅按实际材料支持的事实回答；矛盾未消解的事项为无法确认。'})
+        routing={k:v for k,v in request.route.items() if k not in {
+            'business_context','execution_results','saved_replies','goal_progress','goal_view',
+            'resolved_episode','response_goals','response_request','query_failures'}}
+        messages = [messages[0], {'role': 'system', 'content': instructions(routing)},
+                    {'role': 'system', 'content': citation_context(request.sources)}, *messages[1:]]
+        web = web_evidence(last_turn(request.messages))
+        if web['candidate_urls']:
+            messages.insert(1, {'role': 'system', 'content':
+                '本轮网页证据状态（从实际回执生成）：' + json.dumps(web, ensure_ascii=False) +
+                '\n搜索摘要是候选线索，正文节选是已读取材料。仅按实际材料支持的事实回答；矛盾未消解的事项为无法确认。'})
         facts = outcome_facts(last_turn(request.messages))
         if not request.route.get('response_needs', {}).get('retrieval_statistics', True):
             for observation in facts['observations']:

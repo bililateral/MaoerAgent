@@ -18,10 +18,7 @@ internal class AgentConversationController(private val storage: AgentStorage, pr
     private val follower = AgentRunFollower(api, tools)
     init { scope.launch {
         try {
-            val saved = records.history()
-            val history = if (saved.starterQuestions.isEmpty()) {
-                saved.copy(starterQuestions = agentStarterQuestions()).also { records.save(it) }
-            } else saved
+            val history = records.history()
             mutable.value = AgentUiState(history, ready = true, connected = storage.connection().token.isNotBlank(),
                                         personalizedSearch = storage.personalizedSearch())
         }
@@ -42,8 +39,6 @@ internal class AgentConversationController(private val storage: AgentStorage, pr
             catch (_: Exception) { mutable.value = mutable.value.copy(notice = errorText("hint_save_failed")) }
         }
     }
-    private fun capabilities() = listOf("episode_selection_v2", "research_v3", "library_read_v1") +
-        if (mutable.value.personalizedSearch) listOf("search_hints") else emptyList()
     suspend fun probeSsh(value: AgentSshConfig) = api.probeSsh(value)
     suspend fun configure(value: AgentConnection) = withContext(Dispatchers.Main) {
         if (configuring || mutable.value.working) throw AppFailure("configuration_busy")
@@ -85,7 +80,7 @@ internal class AgentConversationController(private val storage: AgentStorage, pr
         work {
             val turn = AgentTurn(agentId(), question.trim())
             save(old.copy(turns = (old.turns + turn).takeLast(30)))
-            follow(api.create(AgentNewRun(turn.id, old.conversationId, turn.question, capabilities())))
+            follow(api.create(AgentNewRun(turn.id, old.conversationId, turn.question, mutable.value.personalizedSearch)))
         }
     }
     fun reconnect(retry: Boolean = false) = work {
@@ -111,7 +106,7 @@ internal class AgentConversationController(private val storage: AgentStorage, pr
         val turn = h.turns.lastOrNull() ?: return@work
         val run = try { api.get(turn.id) } catch (e: AgentApiException) {
             if (e.status != 404) throw e
-            api.create(AgentNewRun(turn.id, h.conversationId, turn.question, capabilities()))
+            api.create(AgentNewRun(turn.id, h.conversationId, turn.question, mutable.value.personalizedSearch))
         }
         follow(if (retry && run.status == "failed") api.retry(run.id) else run)
     }
