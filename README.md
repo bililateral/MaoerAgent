@@ -548,6 +548,8 @@ bash agent-server/start.sh status
 
 升级部署必须复制完整 `agent-server/maoer_agent/` 包（包含各层 `__init__.py` 和 `resources/*.json`），不能只复制一级 `*.py`。现有 `python agent-server/main.py`、`python agent-server/chat.py` 和两平台启动脚本继续可用；从任意工作目录用脚本绝对路径启动时，配置仍取项目根目录 `.local`。先等待活动任务结束并停止服务，再同步整个包及入口，随后启动并核对健康与实际任务；不要同时运行两个实例。升级时保留原有运行数据。
 
+RSS缓存仅支持当前格式，旧格式不支持，不自动迁移或刷新升级。当前格式继续支持缓存时效、ETag／Last-Modified条件请求、304复用及刷新失败后的缓存读取；格式检查不会删除或改写原缓存。
+
 默认复用 `$HOME/miniconda3/envs/py310/bin/python`；路径不同可通过环境变量 `AGENT_PYTHON` 指定已有解释器。脚本通过 `nohup` 后台运行，日志写入 `.local/agent-server.log`，进程锁避免重复启动；未安装系统服务，不提供服务器重启后的自动启动或崩溃拉起。完整依赖和凭据需要先准备好，启动输出后还应检查 `/healthz` 与实际 Agent 请求。
 
 迁移已有会话时先停止原服务，再一致地复制 `.local/agent-tasks.sqlite3`、`.local/agent-tasks.sqlite3.checkpoints` 和 `.local/agent-server.token`；模型配置仅复制当前使用的供应商。原实例保持停止，避免新旧服务各自处理同一任务。Android 会保留已保存的地址，需要在连接设置中手动切换；未完成任务时禁止切换服务器，但允许修正同一服务器的令牌并恢复。

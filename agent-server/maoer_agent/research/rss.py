@@ -129,16 +129,17 @@ class RssResearch:
 
     async def load(self, source, force=False, diagnostics=None):
         fetched, rows = self.store.feed(source['id'])
-        compatible=fetched>0 and all('duration_seconds' in r and r.get('identity_version') == FEED_IDENTITY_VERSION for r in rows)
-        if not force and compatible and time.time() - fetched < 3600:
+        if any('duration_seconds' not in row or row.get('identity_version') != FEED_IDENTITY_VERSION for row in rows):
+            raise ValueError('rss_cache_format_unsupported')
+        if not force and fetched > 0 and time.time() - fetched < 3600:
             return fetched, rows
-        validators=self.store.feed_headers(source['id']) if compatible else {}
+        validators=self.store.feed_headers(source['id']) if fetched > 0 else {}
         async with self.slots:
             try:
                 async with self.client.stream('GET', source['feed_url'], follow_redirects=True,
                                               headers={'Accept': 'application/rss+xml, application/xml, */*',
                                                        'User-Agent': 'MaoerAgent/0.3 RSS', **validators}, timeout=15) as response:
-                    if response.status_code==304 and compatible:
+                    if response.status_code==304 and fetched > 0:
                         updated=rows
                     else:
                         response.raise_for_status()
