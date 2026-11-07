@@ -40,11 +40,10 @@ from maoer_agent.workflows import goals as task_goals
 
 
 class AgentGraph:
-    def __init__(self, settings, store, model, get_run, research, catalog, page_renderer, query_renderer):
+    def __init__(self, settings, store, model, get_run, research, catalog, query_renderer):
         self.settings, self.store, self.model, self.get_run = settings, store, model, get_run
         self.research = research
         self.catalog = catalog
-        self.page_renderer = page_renderer
         self.query_renderer = query_renderer
         self.context = ContextAssembler()
         self.feed_urls = frozenset(i['feed_url'] for i in catalog)

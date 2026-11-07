@@ -17,7 +17,7 @@ from maoer_agent.runtime.dispatch import ToolDispatcher
 
 
 class AgentTasks:
-    def __init__(self, settings, saver, store, model, research, catalog, page_renderer, query_renderer, *, query_scope_cleanup=None):
+    def __init__(self, settings, saver, store, model, research, catalog, query_renderer, *, query_scope_cleanup=None):
         self.settings, self.store = settings, store
         self.saver = saver
         self.deletion_lock = asyncio.Lock()
@@ -25,7 +25,7 @@ class AgentTasks:
         self.jobs = {}
         self.query_scope_cleanup = query_scope_cleanup or (lambda scope: None)
         self.dispatcher = ToolDispatcher(store, self.get_run)
-        self.graph = AgentGraph(settings, store, model, self.get_run, research, catalog, page_renderer, query_renderer).compile(saver)
+        self.graph = AgentGraph(settings, store, model, self.get_run, research, catalog, query_renderer).compile(saver)
 
     def launch(self, run_id, value):
         if run_id in self.jobs: raise TaskConflict('task_busy')
