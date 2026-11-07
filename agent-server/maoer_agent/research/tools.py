@@ -11,7 +11,7 @@ WEB_PAGE_CHARACTERS = 6000
 
 
 class ResearchTools:
-    def __init__(self, store, rss, web, web_relevance=None):
+    def __init__(self, store, rss, web, web_relevance):
         self.store, self.rss, self.web = store, rss, web
         self.web_relevance=web_relevance
 
@@ -25,7 +25,7 @@ class ResearchTools:
         request_id = context.request_key
         if name == 'web_search':
             query=args['query']
-            as_of=getattr(context,'as_of_date','')
+            as_of=context.as_of_date
             if args.get('delivery','answer')!='results' and as_of and as_of not in query:
                 query += ' as of ' + as_of
             checkpoint = context.checkpoint
@@ -51,11 +51,11 @@ class ResearchTools:
                               'evidence_truncated': True, 'freshness': 'refreshed',
                               'fetched_at': checkpoint['fetched_at']})
             candidates={}
-            if args.get('delivery')=='results' and self.web_relevance is not None and items:
+            if args.get('delivery')=='results' and items:
                 original=items
                 documents=[{'id':str(i),'title':item['title'],'url':item['source_url'],'passages':[{'id':'search','text':item['evidence']}]} for i,item in enumerate(original)]
                 try:
-                    selection=await self.web_relevance.select(context.information_request or args['query'],documents,getattr(context,'web_relevance_model',None))
+                    selection=await self.web_relevance.select(context.information_request or args['query'],documents,context.web_relevance_model)
                 except ValueError as error:
                     return {'status':'error','code':'invalid_model_response','note':error_message('invalid_model_response'),
                         'stage':'web_relevance','reason':str(error)[:500],'items':[],'candidate_items':original}
@@ -67,7 +67,7 @@ class ResearchTools:
                     'note': '搜索摘要不是网页正文；核实关键事实时继续读取原网页。'}
         url = args['url']
         # Prior real links are locators; only a new read supplies this turn's evidence.
-        known = {s.get('source_url') for s in context.sources} | set(getattr(context,'known_urls',()))
+        known = {s.get('source_url') for s in context.sources} | set(context.known_urls)
         for source in context.sources:
             known.update(public_links(source.get('evidence', '')))
         known.update(public_links(context.question))

@@ -17,13 +17,13 @@ from maoer_agent.runtime.dispatch import ToolDispatcher
 
 
 class AgentTasks:
-    def __init__(self, settings, saver, store, model, research, catalog, query_renderer, *, query_scope_cleanup=None):
+    def __init__(self, settings, saver, store, model, research, catalog, query_renderer, *, query_scope_cleanup):
         self.settings, self.store = settings, store
         self.saver = saver
         self.deletion_lock = asyncio.Lock()
         self.model = model
         self.jobs = {}
-        self.query_scope_cleanup = query_scope_cleanup or (lambda scope: None)
+        self.query_scope_cleanup = query_scope_cleanup
         self.dispatcher = ToolDispatcher(store, self.get_run)
         self.graph = AgentGraph(settings, store, model, self.get_run, research, catalog, query_renderer).compile(saver)
 
