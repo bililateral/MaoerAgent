@@ -111,6 +111,18 @@ def checked_result(call, raw):
                     raise ValueError('wrong_skip')
                 if call['name'] == 'set_playback_speed' and parsed.playback_speed != args['speed']:
                     raise ValueError('unobserved_speed')
+                if call['name'] == 'seek_playback':
+                    args=call['arguments']
+                    if raw.get('seek_mode')!=args['mode'] or raw.get('seek_seconds')!=args['seconds']:
+                        raise ValueError('wrong_seek_request')
+                    before,target,actual,duration=(raw.get(k) for k in ('seek_from_ms','seek_target_ms','position_ms','duration_ms'))
+                    if any(type(v) is not int for v in (before,target,actual,duration)) or duration<=0 or before<0:
+                        raise ValueError('missing_seek_observation')
+                    requested=args['seconds']*1000+(before if args['mode']=='relative' else 0)
+                    if target!=max(0,min(duration,requested)) or abs(actual-target)>1500 or not parsed.episode_id:
+                        raise ValueError('unobserved_seek')
+                    if raw.get('seek_episode_id')!=parsed.episode_id or raw.get('seek_play_when_ready') is not parsed.play_when_ready:
+                        raise ValueError('seek_state_changed')
                 if call['name'] == 'set_sleep_timer':
                     minutes = args['minutes']
                     end, remaining = parsed.sleep_end_of_episode, parsed.sleep_remaining_ms
@@ -168,7 +180,7 @@ def outcome_facts(messages):
             row = {'call_id': message['tool_call_id'], 'tool': calls[message['tool_call_id']],
                    'status': result.get('status', 'unknown')}
             for key in ('executed', 'code', 'reason', 'playing', 'episode_id', 'playback_speed',
-                        'sleep_remaining_ms', 'sleep_end_of_episode', 'has_more', 'observation_scope'):
+                        'sleep_remaining_ms', 'sleep_end_of_episode', 'has_more', 'observation_scope', 'position_ms', 'seek_target_ms'):
                 if key in result: row[key] = result[key]
             if isinstance(result.get('items'), list):
                 row['evidence'] = [{'id': i.get('id'), 'citation': i.get('citation'),

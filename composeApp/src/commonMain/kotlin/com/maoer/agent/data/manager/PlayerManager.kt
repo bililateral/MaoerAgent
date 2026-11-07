@@ -136,6 +136,7 @@ class PlayerManager(private val storage: KeyValueStorage, private val mediaContr
         mediaController.seekToMs((positionMs.value + deltaMs).coerceIn(0L, durationMs.value.coerceAtLeast(0)))
     }
     fun seekTo(value: Float) = mediaController.seekTo(value)
+    fun seekToMs(position: Long) = mediaController.seekToMs(position)
     fun setPlaybackSpeed(speed: Float) = mediaController.setPlaybackSpeed(PlaybackOptions.validSpeed(speed))
     fun setSleepTimer(minutes: Int?) {
         require(minutes == null || minutes == -1 || minutes in 1..180)

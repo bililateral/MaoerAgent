@@ -55,6 +55,7 @@ internal class PlaybackToolHandler(private val repository: PodcastRepository, pr
                     put("direction", direction); put("target_episode_id", target.id)
                 }
             }
+            "seek_playback" -> seek(args)
             "set_playback_speed" -> {
                 require(args.keys == setOf("speed"))
                 val speed = args.getValue("speed").jsonPrimitive.float
@@ -80,6 +81,33 @@ internal class PlaybackToolHandler(private val repository: PodcastRepository, pr
                 })
             }
             else -> error(errorText("tool_unsupported"))
+        }
+    }
+    private suspend fun seek(args: JsonObject): JsonObject {
+        require(args.keys == setOf("mode", "seconds"))
+        val mode = args.getValue("mode").jsonPrimitive.content
+        val seconds = args.getValue("seconds").jsonPrimitive.int
+        require(mode in setOf("relative", "absolute") && (mode != "absolute" || seconds >= 0))
+        val id = player.playbackAudioId.value ?: return error("尚未选择分集。", "playback_no_selection")
+        val intent = player.playWhenReady.value ?: return error("无法确认播放器状态。", "playback_state_unknown")
+        val duration = player.durationMs.value
+        if (duration <= 0) return error("尚未取得分集时长，无法定位。", "playback_duration_unknown")
+        val from = player.positionMs.value
+        val requested = seconds.toLong() * 1000 + if (mode == "relative") from else 0
+        val target = requested.coerceIn(0L, duration)
+        player.seekToMs(target)
+        val observed = withTimeoutOrNull(3000) {
+            while (player.playbackAudioId.value == id && player.playWhenReady.value == intent) {
+                if (kotlin.math.abs(player.positionMs.value - target) <= 750) return@withTimeoutOrNull true
+                delay(100)
+            }
+            false
+        } == true
+        return buildJsonObject {
+            state(if (observed) "ok" else "unknown", if (observed) "已定位播放进度。" else "无法确认播放定位结果。")
+                .forEach { (key, value) -> put(key, value) }
+            put("seek_mode", mode); put("seek_seconds", seconds); put("seek_from_ms", from)
+            put("seek_target_ms", target); put("seek_episode_id", id); put("seek_play_when_ready", intent)
         }
     }
     private suspend fun awaitPlaying(id: String): JsonObject {

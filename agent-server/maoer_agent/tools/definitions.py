@@ -111,6 +111,17 @@ class Skip(StrictModel):
     direction: Literal['previous', 'next']
 
 
+class Seek(StrictModel):
+    mode: Literal['relative', 'absolute']
+    seconds: int = Field(strict=True, ge=-2147483648, le=2147483647)
+
+    @model_validator(mode='after')
+    def position(self):
+        if self.mode == 'absolute' and self.seconds < 0:
+            raise ValueError('Absolute position must be nonnegative')
+        return self
+
+
 @dataclass(frozen=True)
 class ToolSpec:
     input_model: type
@@ -145,6 +156,7 @@ TOOLS = {
     'pause_playback': ToolSpec(Empty, '暂停手机当前播放。', 'device', 'device', 'playback', changes_state=True, retry='never_replay', retention='receipt'),
     'resume_playback': ToolSpec(Empty, '继续手机当前播放；没有选中分集时不能执行。', 'device', 'device', 'playback', changes_state=True, retry='never_replay', retention='receipt'),
     'skip_episode': ToolSpec(Skip, '在当前完整队列切换一集并播放。direction=previous上一集、next下一集；首尾循环，恢复目标分集续听进度。', 'device', 'device', 'playback', changes_state=True, retry='never_replay'),
+    'seek_playback': ToolSpec(Seek, '定位当前分集进度，保持播放或暂停状态。mode=relative按执行时实际位置偏移seconds（负数后退），absolute跳到非负秒数；越界限制在分集范围内。', 'device', 'device', 'playback', changes_state=True, retry='never_replay'),
     'set_playback_speed': ToolSpec(Speed, '设置手机播放倍速，可选0.75、1、1.25、1.5、1.75、2倍；不改变播放或暂停状态。', 'device', 'device', 'playback', changes_state=True, retry='never_replay', retention='receipt'),
     'set_sleep_timer': ToolSpec(Timer, '设置手机睡眠定时，minutes 为 1..180；0 取消，-1 本集结束时暂停。', 'device', 'device', 'playback', changes_state=True, retry='never_replay', retention='receipt'),
 }
