@@ -217,19 +217,3 @@ def library_completion_call(route,messages,progress=None):
     if last.get('has_more') and following>last['offset'] and following not in offsets:
         return {'name':'query_library','arguments':{**selection,'offset':following}}
     return None
-
-
-def waiting_selection_step(route,progress,messages,question):
-    """One model-written question, with choices from the actual selection page."""
-    plan=goals(route)
-    waiting=[g for g in plan if progress.get(g['id'],{}).get('status')=='waiting_user']
-    if (len(waiting)!=1 or waiting[0]['kind']!='control' or waiting[0].get('action')!='play_episode'
-            or route.get('web') or route.get('library') or route.get('episode_criteria',{}).get('requested')
-            or route.get('response_needs',{}).get('brief_episode_intro') or not question):return None
-    if any(g['kind'] not in ('control','catalog_query') or
-           (g['kind']=='catalog_query' and g['id'] not in waiting[0].get('depends_on',[])) for g in plan):return None
-    rows=goal_observations(last_turn(messages))
-    pages=[r for c,r in rows if c['name']=='list_episodes' and r.get('status')=='ok' and r.get('items')]
-    if len(pages)!=1:return None
-    receipts=[{'name':c['name'],'arguments':c['arguments'],'result':r} for c,r in rows if TOOLS[c['name']].changes_state]
-    return {'kind':'waiting_selection','result':pages[0],'receipts':receipts,'question':question}

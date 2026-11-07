@@ -51,12 +51,6 @@ def query_reply(step):
     if step['kind']=='literal_titles':
         return ('\n'.join(f"{n}. **{_text(item['title'])}**[{item['citation']}]" for n,item in enumerate(step['items'],1))
                 if step['items'] else '未找到符合字面条件的分集。')
-    if step['kind']=='waiting_selection':
-        rows=[]
-        if step['receipts']:rows.append(query_reply({'kind':'control_receipts','receipts':step['receipts'],'unsupported':[]}))
-        rows.append(query_reply({'kind':'episode_page','result':step['result'],'titles_only':False}))
-        rows.append(step['question'])
-        return '\n\n'.join(rows)
     if step['kind']=='duration_candidates':
         rows=[]
         for n,item in enumerate(step['items'],1):
