@@ -107,7 +107,7 @@ def query_reply(step):
     if step['kind']=='control_receipts':
         rows=[]
         actions={'play_episode':'播放','pause_playback':'暂停','resume_playback':'继续播放',
-            'skip_episode':'切集','seek_playback':'定位进度','set_playback_speed':'调整倍速','set_sleep_timer':'设置定时'}
+            'skip_episode':'切集','seek_playback':'定位进度','set_favorite':'设置收藏','set_playback_speed':'调整倍速','set_sleep_timer':'设置定时'}
         for receipt in step['receipts']:
             name=receipt['name'];result=receipt['result'];args=receipt['arguments'];action=actions[name]
             status=result.get('status','unknown')
@@ -119,6 +119,7 @@ def query_reply(step):
             elif name=='set_sleep_timer':
                 minutes=args['minutes']
                 text='已取消睡眠定时。' if minutes==0 else '已设置本集结束后停止。' if minutes==-1 else f'已设置{minutes}分钟睡眠定时。'
+            elif name=='set_favorite':text='已收藏。' if result['favorite'] else '已取消收藏。'
             elif name=='seek_playback':
                 seconds=result['position_ms']//1000
                 text=f'已定位到{seconds//60}分{seconds%60}秒。'
@@ -138,7 +139,7 @@ def query_reply(step):
     if step['kind'] == 'execution_facts':
         result = step['result']
         operation = {'play_episode': '播放分集', 'pause_playback': '暂停', 'resume_playback': '继续播放',
-            'skip_episode':'切集','seek_playback':'定位进度', 'set_playback_speed': '调整倍速',
+            'skip_episode':'切集', 'seek_playback':'定位进度', 'set_favorite':'设置收藏', 'set_playback_speed': '调整倍速',
             'set_sleep_timer': '设置或取消定时'}[step['name']]
         status = result.get('status', 'unknown')
         facts = {'操作': operation, '结果': {'ok': '已完成', 'error': '失败', 'unknown': '无法确认',
@@ -228,7 +229,7 @@ def query_reply(step):
     if step['kind'] == 'library':
         return library_reply(step)
     if step['kind'] == 'unsupported':
-        labels = {'add_favorite': '添加收藏', 'remove_favorite': '取消收藏',
+        labels = {
                   'mark_completed': '标记听完', 'download': '下载分集', 'delete_download': '删除下载'}
         return '当前助手不支持' + '、'.join(labels[a] for a in step['actions']) + '。'
     if step['kind'] == 'introduction':

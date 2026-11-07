@@ -122,6 +122,19 @@ class Seek(StrictModel):
         return self
 
 
+class Favorite(StrictModel):
+    kind: Literal['podcast', 'episode']
+    podcast_id: str = Field(min_length=1, max_length=150)
+    episode_id: str = Field(default='', max_length=2000)
+    favorite: bool = Field(strict=True)
+
+    @model_validator(mode='after')
+    def identity(self):
+        if (self.kind == 'episode') != bool(self.episode_id):
+            raise ValueError('Only episode favorites require episode_id')
+        return self
+
+
 @dataclass(frozen=True)
 class ToolSpec:
     input_model: type
@@ -157,6 +170,7 @@ TOOLS = {
     'resume_playback': ToolSpec(Empty, '继续手机当前播放；没有选中分集时不能执行。', 'device', 'device', 'playback', changes_state=True, retry='never_replay', retention='receipt'),
     'skip_episode': ToolSpec(Skip, '在当前完整队列切换一集并播放。direction=previous上一集、next下一集；首尾循环，恢复目标分集续听进度。', 'device', 'device', 'playback', changes_state=True, retry='never_replay'),
     'seek_playback': ToolSpec(Seek, '定位当前分集进度，保持播放或暂停状态。mode=relative按执行时实际位置偏移seconds（负数后退），absolute跳到非负秒数；越界限制在分集范围内。', 'device', 'device', 'playback', changes_state=True, retry='never_replay'),
+    'set_favorite': ToolSpec(Favorite, '设置真实节目或分集的收藏状态。kind=podcast/episode；podcast_id必填，episode时另填episode_id；favorite=true收藏、false取消。先查询确认身份，重复设置不反转，不开始播放。', 'device', 'device', 'favorite', changes_state=True, retry='never_replay'),
     'set_playback_speed': ToolSpec(Speed, '设置手机播放倍速，可选0.75、1、1.25、1.5、1.75、2倍；不改变播放或暂停状态。', 'device', 'device', 'playback', changes_state=True, retry='never_replay', retention='receipt'),
     'set_sleep_timer': ToolSpec(Timer, '设置手机睡眠定时，minutes 为 1..180；0 取消，-1 本集结束时暂停。', 'device', 'device', 'playback', changes_state=True, retry='never_replay', retention='receipt'),
 }

@@ -74,6 +74,22 @@ class ListeningLibrary(
     fun reportSaveFailure() { _error.value = errorText("library_write_failed") }
 
     fun toggleFavorite(audio: Audio) = action { mutate(audio) { it.copy(favorite = !it.favorite) } }
+    /** Explicit tool writes return only after persistence succeeds. */
+    suspend fun setFavorite(audio: Audio, favorite: Boolean) {
+        awaitReady()
+        if (!favorite && entry(audio.id) == null) return
+        mutate(audio) { it.copy(favorite = favorite) }
+    }
+    suspend fun setBookmark(id: String, favorite: Boolean) {
+        awaitReady()
+        mutex.withLock {
+            val ids = if (favorite) _bookmarks.value + id else _bookmarks.value - id
+            if (ids != _bookmarks.value) {
+                persistence.writeBookmarks(ids)
+                _bookmarks.value = ids
+            }
+        }
+    }
     fun toggleBookmark(id: String) = action {
         awaitReady()
         mutex.withLock {

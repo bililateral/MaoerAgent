@@ -130,6 +130,10 @@ def checked_result(call, raw):
                         (minutes == -1 and end) or (minutes == 0 and not end and remaining == 0)
                         or (minutes > 0 and not end and minutes * 60000 - 5000 <= remaining <= minutes * 60000)):
                         raise ValueError('unobserved_timer')
+            elif spec.result_kind == 'favorite':
+                args=call['arguments']
+                if any(raw.get(k)!=v for k,v in args.items()) or type(raw.get('favorite')) is not bool:
+                    raise ValueError('unobserved_favorite')
             else:
                 if parsed.items is None:
                     raise ValueError('missing_items')
@@ -180,7 +184,8 @@ def outcome_facts(messages):
             row = {'call_id': message['tool_call_id'], 'tool': calls[message['tool_call_id']],
                    'status': result.get('status', 'unknown')}
             for key in ('executed', 'code', 'reason', 'playing', 'episode_id', 'playback_speed',
-                        'sleep_remaining_ms', 'sleep_end_of_episode', 'has_more', 'observation_scope', 'position_ms', 'seek_target_ms'):
+                        'sleep_remaining_ms', 'sleep_end_of_episode', 'has_more', 'observation_scope',
+                        'position_ms', 'seek_target_ms', 'kind', 'podcast_id', 'favorite'):
                 if key in result: row[key] = result[key]
             if isinstance(result.get('items'), list):
                 row['evidence'] = [{'id': i.get('id'), 'citation': i.get('citation'),

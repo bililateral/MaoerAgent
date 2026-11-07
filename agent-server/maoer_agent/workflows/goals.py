@@ -153,7 +153,7 @@ def planned_control(route,progress,names):
     for goal in goals(route):
         p=progress.get(goal['id'],{})
         name=goal.get('action','')
-        if (goal['kind']!='control' or name=='play_episode' or name not in names
+        if (goal['kind']!='control' or name in ('play_episode','set_favorite') or name not in names
                 or p.get('status','pending')!='pending' or p.get('call_ids') or not ready(goal,progress)):
             continue
         if parameter_state(goal)=='supported':
@@ -236,7 +236,7 @@ def scope(route,progress,available,allowed):
         elif not TOOLS[name].changes_state:
             if finished:names.add(name)
             elif query_ready and not closed_query and (name!='get_playback_state' or not ordered_state_waiting):names.add(name)
-            elif any(g['kind']=='control' and g.get('action')=='play_episode' for g in active) and TOOLS[name].scope in ('podcast','device'):
+            elif any(g['kind']=='control' and g.get('action') in ('play_episode','set_favorite') for g in active) and TOOLS[name].scope in ('podcast','device'):
                 names.add(name)
     # No pending ordered state goal blocks a new, model-selected state read.
     if route.get('device') and not any(g['kind']=='device_query' and progress.get(g['id'],{}).get('status','pending') not in TERMINAL and not ready(g,progress) for g in plan):

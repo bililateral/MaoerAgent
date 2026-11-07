@@ -11,10 +11,12 @@ class AgentTools(repository: PodcastRepository, player: PlayerManager, storage: 
     private val catalog = CatalogToolHandler(repository)
     private val playback = PlaybackToolHandler(repository, player, state)
     private val personal = LibraryToolHandler(repository, library, downloads)
+    private val favorites = FavoriteToolHandler(repository, library)
     private val executor = AgentToolExecutor(storage,
         claim = { run, call -> api.claim(run, call); Unit },
         perform = { call -> when {
             call.name == "query_library" -> personal.perform(call)
+            call.name == "set_favorite" -> favorites.perform(call)
             call.name in CatalogToolHandler.names -> catalog.perform(call)
             else -> playback.perform(call)
         } },

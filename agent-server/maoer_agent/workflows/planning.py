@@ -25,11 +25,12 @@ def prepare_calls(messages, memory, calls, message, allowed, run_id, rounds):
                     known.extend(result.get('items', []))
         for call in calls:
             args = call['arguments']
-            if call['name'] in ('list_episodes', 'get_podcast_details') and not any(
+            if (call['name'] in ('list_episodes', 'get_podcast_details') or call['name']=='set_favorite') and not any(
                     (item.get('id') == args['podcast_id'] and item.get('kind') == 'podcast') or
                     (item.get('podcast_id') == args['podcast_id'] and item.get('kind') == 'episode') for item in known):
                 invalid_identities.setdefault(call['id'], 'unverified_podcast_id')
-            if call['name'] in ('play_episode', 'read_episode_description') and not any(
+            if (call['name'] in ('play_episode', 'read_episode_description') or
+                    (call['name']=='set_favorite' and args.get('kind')=='episode')) and not any(
                     item.get('id') == args['episode_id'] and item.get('podcast_id') == args['podcast_id']
                     and item.get('kind') == 'episode' for item in known):
                 invalid_identities.setdefault(call['id'], 'unverified_episode_id')
