@@ -6,7 +6,7 @@ from maoer_agent.contracts.errors import ModelFailure
 from maoer_agent.tools.definitions import same_arguments
 from maoer_agent.memory.history import last_turn, PLAYBACK_SNAPSHOT_TOOLS
 from maoer_agent.workflows.episode_pages import observations
-from maoer_agent.context.route import episode_pages,displayed_episode_pages,displayed_selection
+from maoer_agent.context.display import displayed_episode_pages,displayed_selection
 
 
 def normalize_selector(lookup, message, displayed_pages=()):
@@ -16,6 +16,7 @@ def normalize_selector(lookup, message, displayed_pages=()):
     clause=re.split(r'[，,。；;！？!?]',message.strip(),maxsplit=1)[0].strip()
     simple=re.fullmatch(r'(?:(?:请|帮我)\s*)?(?:(?:介绍|查询|查找|查一下|查|看看|说说)\s*)?'
         r'(?:《(?P<podcast>[^》]{1,150})》\s*)?'
+        r'(?P<display>(?:(?:刚才|刚刚|当前|这)(?:展示|显示|列出|发)?(?:的)?(?:这|那)?(?:一|份|个)?(?:页|列表))(?:的)?)?'
         r'第(?P<number>[0-9]{1,6}|[零〇一二两三四五六七八九十百千]+)(?P<unit>期|条|个|集)'
         r'(?:在讲什么|讲什么|的内容|是什么|的标题)?',clause)
     tail=message[len(clause):]
@@ -31,9 +32,9 @@ def normalize_selector(lookup, message, displayed_pages=()):
                 else:number+=(part or 1)*{'十':10,'百':100,'千':1000}[char];part=0
             number+=part
         title=simple['podcast'] or lookup.get('podcast_title','')
-        pages=[p for p in displayed_pages if not title or p.get('podcast_title')==title]
+        pages=[p for p in displayed_pages if not title or p.get('podcast_title','') in ('',title)]
         if 0<number<=100000:
-            if pages and simple['unit']!='集':
+            if pages and (simple['display'] or simple['unit']!='集'):
                 lookup={**lookup,'target_kind':'episode_selection','selector_kind':'displayed_page',
                     'selector_value':number,'page_reference':pages[-1]['reference'],'podcast_title':title,
                     'episode_id':'','podcast_id':'','episode_title':''}
@@ -56,7 +57,7 @@ def normalize_selector(lookup, message, displayed_pages=()):
                     'podcast_title':page.get('podcast_title',''),'episode_id':item['id'],
                     'podcast_id':item['podcast_id'],'query':item['title']},False
         # Keep the unresolved relation for the existing clarification path.
-        return lookup,False
+        return {**lookup,'page_reference':'','episode_id':'','podcast_id':'','episode_title':'','query':''},False
     title_query = re.fullmatch(r'(?:请\s*)?(?:帮我\s*)?(?:查询|查找|找|查)\s*《(?P<podcast>[^》]{1,150})》'
         r'标题(?:包含|含)[“「"](?P<title>[^”」"]{1,100})[”」"](?:的)?(?:那集|分集)'
         r'(?:[，,。；;]\s*(?:先别播放|不要播放|不播放|先列出来让我选))*[。.!！]?', message.strip())
@@ -110,7 +111,7 @@ def selection_step(route, messages, names):
     if lookup.get('target_kind') != 'episode_selection' or kind == 'none' or not number:
         return None
     if kind == 'displayed_page':
-        bound=displayed_selection(lookup,episode_pages(messages)+displayed_episode_pages(messages))
+        bound=displayed_selection(lookup,displayed_episode_pages(messages))
         if not bound:
             return None  # Missing/ambiguous display context must be clarified by the model.
         page,item=bound

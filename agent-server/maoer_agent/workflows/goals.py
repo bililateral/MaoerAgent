@@ -7,8 +7,8 @@ from maoer_agent.tools.definitions import TOOLS
 from maoer_agent.tools.results import receipt_evidence
 from maoer_agent.memory.history import last_turn, podcast_identities
 from maoer_agent.workflows.episode_pages import active as page_workflow_active
-from maoer_agent.workflows.pagination import observed_page, page_continuation
-from maoer_agent.context.route import displayed_selection, displayed_episode_pages
+from maoer_agent.workflows.pagination import observed_page, page_continuation, requested_page
+from maoer_agent.context.display import displayed_selection, displayed_episode_pages
 
 TERMINAL={'satisfied','failed','unknown','unavailable','waiting_user','blocked'}
 QUERY_KINDS={'public_query','catalog_query','library_query','general'}
@@ -77,6 +77,15 @@ def reconcile(route,previous,bindings,messages,control_blocked=False):
     rows={c['id']:(index,c,r) for index,(c,r) in enumerate(observations(last_turn(messages)))}
     for goal in goals(route):
         p=progress.setdefault(goal['id'],{'status':'pending','call_ids':[]})
+        target=goal.get('target') or (route.get('page_lookup',{}) if len(goals(route))==1 else {})
+        if (goal['kind']=='catalog_query' and ready(goal,progress)
+                and target.get('selector_kind')=='displayed_page' and not target.get('page_reference')):
+            p.update(status='waiting_user',reason='展示列表中的目标尚未确定，需要用户指定分集')
+        request=goal.get('page_request')
+        if goal['kind']=='catalog_query' and request and request['operation']=='next' and ready(goal,progress):
+            page=requested_page(request,messages)
+            if page and not page.get('query'):
+                p.update(status='waiting_user',reason='当前展示列表没有可确认的续页位置，需要用户指定列表')
         if (goal['kind']=='catalog_query' and ready(goal,progress)
                 and route.get('response_needs',{}).get('titles_only')
                 and not episode_description_required(route,goal)):

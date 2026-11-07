@@ -35,6 +35,9 @@ def unsupported_setting_step(route,progress):
 
 def selection_clarification_step(route,progress,messages):
     plan=goals(route)
+    if (len(plan)==1 and plan[0]['kind']=='catalog_query'
+            and progress.get(plan[0]['id'],{}).get('status')=='waiting_user'):
+        return {'kind':'selection_clarification','receipts':[]}
     if (not plan or any(g['kind'] not in {'control','unsupported'} for g in plan)
             or not any(g.get('action')=='play_episode' and progress.get(g['id'],{}).get('status')=='waiting_user' for g in plan)):
         return None

@@ -1,7 +1,6 @@
 """Route projection for model input."""
 import json
 import re
-from maoer_agent.tools.results import catalog_page_chain, catalog_page_view
 from datetime import datetime, timezone, timedelta
 from maoer_agent.memory.history import podcast_identities
 
@@ -25,68 +24,9 @@ def episode_pages(messages):
     return pages[-4:]
 
 
-def displayed_episode_pages(messages):
-    """Bind lists actually shown in replies to unique observed IDs."""
-    end=max((i for i,m in enumerate(messages) if m['role']=='user'),default=len(messages))
-    episodes={};podcasts=podcast_identities(messages[:end]);pages=[];calls={};observed=[]
-    for message in messages[:end]:
-        calls.update((c['id'],c['function']) for c in (message.get('tool_calls') or []))
-        if message['role']=='tool':
-            if message.get('tool_call_id') not in calls:continue
-            result=json.loads(message['content'])
-            if result.get('status')!='ok':continue
-            call=calls[message['tool_call_id']]
-            args=json.loads(call['arguments'])
-            if call['name']=='list_episodes' and not args.get('position') and not args.get('episode_number'):
-                observed.append({'call_id':message['tool_call_id'],'arguments':args,'result':result})
-            for item in result.get('items',[]):
-                if item.get('kind')=='podcast':podcasts[item['id']]=item.get('title','')
-                if item.get('kind')=='episode' and item.get('id') and item.get('podcast_id'):
-                    episodes[(item['podcast_id'],item['id'])]=item
-        if message['role']!='assistant' or not message.get('content'):continue
-        rows=[];previous=None;invalid=False
-        def save():
-            if not rows or invalid:return
-            ids={r['podcast_id'] for r in rows}
-            page={'reference':'display'+str(len(pages)+1),'items':list(rows),
-                'podcast_title':podcasts.get(next(iter(ids)),'') if len(ids)==1 else ''}
-            # A delivered contiguous prefix carries its own end cursor, even
-            # when it uses only part of a receipt or spans multiple receipts.
-            identities=[(r['podcast_id'],r['id']) for r in rows]
-            origin=None
-            for candidate in reversed(observed):
-                view=catalog_page_view(catalog_page_chain(observed,candidate['arguments']),len(rows))
-                if view and identities==[(i.get('podcast_id'),i.get('id')) for i in view['result']['items']]:
-                    origin=view;break
-            if origin:
-                page['query']={k:origin[k] for k in ('call_id','arguments')}
-                page['query'].update({k:origin['result'][k] for k in ('offset','has_more','next_offset') if k in origin['result']})
-            pages.append(page)
-        lines=message['content'].splitlines()
-        plain=all(sum(e.get('title')==line.strip().replace('**','') for e in episodes.values())==1
-                  for line in lines if line.strip())
-        for line in lines:
-            match=re.match(r'^\s*(?:(\d+)[.)、]\s*|[-*•]\s+)(.+)',line)
-            if not match:
-                if plain and line.strip():
-                    text=line.strip().replace('**','');ordinal=len(rows)+1
-                    item=next(e for e in episodes.values() if e.get('title')==text)
-                    rows.append({k:item[k] for k in ('id','title','podcast_id')});previous=ordinal
-                    continue
-                if line.strip():save();rows=[];previous=None;invalid=False
-                continue
-            ordinal=int(match[1]) if match[1] else len(rows)+1
-            text=match[2].replace('**','')
-            matches=[e for e in episodes.values() if e.get('title') and e['title'] in text]
-            if previous is not None and ordinal!=previous+1:save();rows=[];invalid=False
-            if len(matches)!=1:invalid=True;previous=ordinal;continue
-            rows.append({k:matches[0][k] for k in ('id','title','podcast_id')});previous=ordinal
-        save()
-    return pages[-4:]
-
-
 def episode_page_state(messages):
     """Separate delivered history from this task's observations, including drafts."""
+    from maoer_agent.context import display
     end=max((i for i,m in enumerate(messages) if m['role']=='user'),default=len(messages))
     calls={};current=[]
     for message in messages[end:]:
@@ -96,20 +36,7 @@ def episode_page_state(messages):
             result=json.loads(message['content'])
             current.append({'call_id':message['tool_call_id'],'arguments':json.loads(call['arguments']),
                 **{k:result[k] for k in ('status','offset','returned','has_more','next_offset') if k in result}})
-    return {'displayed_pages':displayed_episode_pages(messages),'current_queries':current}
-
-
-def displayed_selection(lookup, pages):
-    if lookup.get('selector_kind')!='displayed_page':return None
-    selected=[p for p in pages if (not lookup.get('page_reference') or p['reference']==lookup['page_reference'])
-              and (not lookup.get('podcast_title') or p.get('podcast_title')==lookup['podcast_title'])]
-    if len(selected)!=1:return None
-    page=selected[0];number=lookup.get('selector_value',0)
-    if not 0<number<=len(page['items']):return None
-    item=page['items'][number-1]
-    if any(lookup.get(k) and lookup[k]!=item[v] for k,v in (('episode_id','id'),('podcast_id','podcast_id'))):
-        raise ValueError('Displayed selection identity does not match its actual item')
-    return page,item
+    return {'displayed_pages':display.displayed_episode_pages(messages),'current_queries':current}
 
 
 def known_materials(messages):

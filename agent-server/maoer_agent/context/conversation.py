@@ -1,7 +1,8 @@
 """One historical view; original execution records remain outside model projections."""
 from copy import deepcopy
 from maoer_agent.contracts.context import ConversationContext
-from maoer_agent.context.route import known_materials, episode_pages, displayed_episode_pages
+from maoer_agent.context.route import known_materials, episode_pages
+from maoer_agent.context.display import displayed_episode_pages
 from maoer_agent.memory.history import model_messages
 from maoer_agent.memory.summary import with_summary
 from maoer_agent.research.sources import current_citation_view

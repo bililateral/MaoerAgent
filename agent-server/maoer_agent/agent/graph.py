@@ -393,6 +393,9 @@ class AgentGraph:
             dispatches=dict(self.get_run(run_id).get('plan_dispatches',{}))
             dispatches[identity]=planned['goal_id']
             self.store.update(run_id,plan_dispatches=dispatches)
+        elif direct and direct['kind']=='selection_clarification' and not view['next_step']:
+            message={'role':'assistant','content':self.query_renderer(direct)}
+            messages=state['messages']
         elif (direct and direct['kind']=='control_receipts' and direct.get('receipts')
                 and not view['next_step']):
             message={'role':'assistant','content':self.query_renderer(direct)}

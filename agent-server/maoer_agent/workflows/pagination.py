@@ -1,7 +1,19 @@
 """Catalog page targets and completion from delivered history and paired receipts."""
-from maoer_agent.context.route import displayed_episode_pages, displayed_selection
+import re
+from maoer_agent.context.display import displayed_episode_pages, displayed_selection
 from maoer_agent.memory.history import last_turn, podcast_identities
 from maoer_agent.tools.results import receipt_evidence, catalog_page_chain, catalog_page_view
+
+
+def requested_page(request,messages):
+    pages=displayed_episode_pages(messages)
+    title=request.get('podcast_title','')
+    pages=[p for p in pages if not title or p.get('podcast_title','') in ('',title)]
+    current=next((m.get('content','') for m in reversed(messages) if m['role']=='user'),'').strip()
+    latest=re.fullmatch(r'(?:请)?(?:再|继续|给我|显示)?(?:看|翻)?下一页[。！!]?',current)
+    reference='' if latest else request.get('reference','')
+    selected=[p for p in pages if not reference or p['reference']==reference]
+    return selected[-1] if selected else None
 
 
 def page_target(goal,messages):
@@ -9,12 +21,8 @@ def page_target(goal,messages):
     if goal.get('kind')!='catalog_query' or not request:return None
     if request['operation']!='next':
         return {'offset':request.get('offset',0) if request['operation']=='offset' else 0}
-    pages=displayed_episode_pages(messages)
-    reference=request.get('reference','');title=request.get('podcast_title','')
-    pages=[p for p in pages if (not reference or p['reference']==reference)
-           and (not title or p.get('podcast_title')==title)]
-    if not pages:return None
-    query=pages[-1].get('query')
+    page=requested_page(request,messages)
+    query=page.get('query') if page else None
     if not query or not query.get('has_more') or 'next_offset' not in query:return None
     return {**query['arguments'],'offset':query['next_offset']}
 
