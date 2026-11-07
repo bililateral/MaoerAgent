@@ -8,7 +8,7 @@ from maoer_agent.workflows.episode_pages import observations
 def recovered_selection_reply(route, messages):
     """Keep verified pre-restart execution separate from freshly observed state."""
     actions = route.get('control_actions', [])
-    if len(actions) != 1 or actions[0] not in ('next_episode', 'previous_episode'):
+    if len(actions) != 1 or actions[0] not in ('skip_episode',):
         return None
     if any(route.get(k) for k in ('podcast', 'web', 'library')):
         return None

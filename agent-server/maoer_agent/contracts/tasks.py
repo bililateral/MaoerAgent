@@ -3,8 +3,8 @@ from typing import Literal, get_args
 from pydantic import BaseModel,ConfigDict,Field
 import re
 
-ControlAction = Literal['play_episode','pause_playback','resume_playback','next_episode',
-                        'previous_episode','set_playback_speed','set_sleep_timer']
+ControlAction = Literal['play_episode','pause_playback','resume_playback',
+                        'skip_episode','set_playback_speed','set_sleep_timer']
 UnsupportedAction = Literal['add_favorite','remove_favorite','mark_completed','download','delete_download']
 
 

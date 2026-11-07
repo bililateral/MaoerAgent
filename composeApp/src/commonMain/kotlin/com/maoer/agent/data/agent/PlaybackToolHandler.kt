@@ -39,15 +39,21 @@ internal class PlaybackToolHandler(private val repository: PodcastRepository, pr
                 val id = player.currentAudio.value?.id ?: return error(errorText("playback_no_selection"))
                 player.resume(); awaitPlaying(id)
             }
-            "previous_episode", "next_episode" -> {
-                require(args.isEmpty())
+            "skip_episode" -> {
+                require(args.keys == setOf("direction"))
+                val direction = args.getValue("direction").jsonPrimitive.content
+                require(direction in setOf("previous", "next"))
                 val queue = player.queue.value
                 val index = queue.indexOfFirst { it.id == player.currentAudio.value?.id }
                 if (index < 0) return error(errorText("playback_no_queue"))
-                val next = call.name == "next_episode"
+                val next = direction == "next"
                 val target = queue[if (next) QueueNavigation.nextIndex(index, queue.size) else QueueNavigation.previousIndex(index, queue.size)]
                 if (next) player.next() else player.previous()
-                awaitPlaying(target.id)
+                val result = awaitPlaying(target.id)
+                buildJsonObject {
+                    result.forEach { (key, value) -> put(key, value) }
+                    put("direction", direction); put("target_episode_id", target.id)
+                }
             }
             "set_playback_speed" -> {
                 require(args.keys == setOf("speed"))

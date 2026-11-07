@@ -107,6 +107,10 @@ class Speed(StrictModel):
         return value
 
 
+class Skip(StrictModel):
+    direction: Literal['previous', 'next']
+
+
 @dataclass(frozen=True)
 class ToolSpec:
     input_model: type
@@ -140,8 +144,7 @@ TOOLS = {
     'play_episode': ToolSpec(Play, '播放此前查询结果中的真实 episode_id，恢复既有进度，并保留该节目的完整循环队列。', 'device', 'device', 'playback', changes_state=True, retry='never_replay', retention='receipt'),
     'pause_playback': ToolSpec(Empty, '暂停手机当前播放。', 'device', 'device', 'playback', changes_state=True, retry='never_replay', retention='receipt'),
     'resume_playback': ToolSpec(Empty, '继续手机当前播放；没有选中分集时不能执行。', 'device', 'device', 'playback', changes_state=True, retry='never_replay', retention='receipt'),
-    'previous_episode': ToolSpec(Empty, '切换到手机当前完整队列的上一集并播放，首集向前会循环到末集；没有队列时不执行。', 'device', 'device', 'playback', changes_state=True, retry='never_replay', retention='receipt'),
-    'next_episode': ToolSpec(Empty, '切换到手机当前完整队列的下一集并播放，末集向后会循环到首集；没有队列时不执行。', 'device', 'device', 'playback', changes_state=True, retry='never_replay', retention='receipt'),
+    'skip_episode': ToolSpec(Skip, '在当前完整队列切换一集并播放。direction=previous上一集、next下一集；首尾循环，恢复目标分集续听进度。', 'device', 'device', 'playback', changes_state=True, retry='never_replay'),
     'set_playback_speed': ToolSpec(Speed, '设置手机播放倍速，可选0.75、1、1.25、1.5、1.75、2倍；不改变播放或暂停状态。', 'device', 'device', 'playback', changes_state=True, retry='never_replay', retention='receipt'),
     'set_sleep_timer': ToolSpec(Timer, '设置手机睡眠定时，minutes 为 1..180；0 取消，-1 本集结束时暂停。', 'device', 'device', 'playback', changes_state=True, retry='never_replay', retention='receipt'),
 }

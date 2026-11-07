@@ -50,8 +50,7 @@ internal fun agentWorkLabel(run: AgentRun?): String {
             "play_episode" -> "正在播放所选分集…"
             "pause_playback" -> "正在暂停播放…"
             "resume_playback" -> "正在恢复播放…"
-            "previous_episode" -> "正在切换上一集…"
-            "next_episode" -> "正在切换下一集…"
+            "skip_episode" -> if (call.arguments["direction"]?.jsonPrimitive?.content == "previous") "正在切换上一集…" else "正在切换下一集…"
             "set_playback_speed" -> "正在设置播放速度…"
             "set_sleep_timer" -> when (call.arguments["minutes"]?.jsonPrimitive?.intOrNull) {
                 0 -> "正在取消睡眠定时…"

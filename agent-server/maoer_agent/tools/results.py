@@ -100,13 +100,15 @@ def checked_result(call, raw):
                 if parsed.playing is None or parsed.play_when_ready is None:
                     raise ValueError('missing_playing')
                 args = call['arguments']
-                if call['name'] in ('play_episode', 'resume_playback', 'previous_episode', 'next_episode'):
+                if call['name'] in ('play_episode', 'resume_playback', 'skip_episode'):
                     if not parsed.playing or not parsed.episode_id or parsed.buffering is True:
                         raise ValueError('unobserved_playback')
                     if call['name'] == 'play_episode' and parsed.episode_id != args['episode_id']:
                         raise ValueError('wrong_episode')
                 if call['name'] == 'pause_playback' and (parsed.playing or parsed.play_when_ready is True):
                     raise ValueError('unobserved_pause')
+                if call['name'] == 'skip_episode' and (raw.get('direction') != args['direction'] or raw.get('target_episode_id') != parsed.episode_id):
+                    raise ValueError('wrong_skip')
                 if call['name'] == 'set_playback_speed' and parsed.playback_speed != args['speed']:
                     raise ValueError('unobserved_speed')
                 if call['name'] == 'set_sleep_timer':
