@@ -30,6 +30,11 @@ class Settings:
     model_source_ipv4: str = ''
     model_dns_ipv4: str = ''
     model_temperature: float | None = None
+    langfuse_base_url: str = ''
+    langfuse_public_key: str = ''
+    langfuse_secret_key: str = field(default='', repr=False)
+    langfuse_environment: str = 'production'
+    langfuse_release: str = ''
 
     @property
     def endpoint(self):
@@ -42,6 +47,9 @@ def load_settings(path: Path = ROOT / '.local/agent.env') -> Settings:
     configuration = path.read_text(encoding='utf-8-sig')
     if private_research.exists():
         configuration += '\n' + private_research.read_text(encoding='utf-8-sig')
+    telemetry = path.with_name('langfuse.env')
+    if telemetry.exists():
+        configuration += '\n' + telemetry.read_text(encoding='utf-8-sig')
     for line in configuration.splitlines():
         line = line.strip()
         if not line or line.startswith('#'):
@@ -52,6 +60,10 @@ def load_settings(path: Path = ROOT / '.local/agent.env') -> Settings:
         values[name.strip()] = value.strip().removeprefix('"').removesuffix('"').removeprefix("'").removesuffix("'")
     if values.get('AGENT_PROVIDER', 'openai_compatible') != 'openai_compatible':
         raise ValueError('Only OpenAI-compatible model endpoints are supported')
+    telemetry_fields = [values.get(k, '') for k in
+                        ('LANGFUSE_BASE_URL', 'LANGFUSE_PUBLIC_KEY', 'LANGFUSE_SECRET_KEY')]
+    if any(telemetry_fields) and not all(telemetry_fields):
+        raise ValueError('Incomplete Langfuse configuration')
     key = values.get('AGENT_API_KEY', '')
     if not key or any(c.isspace() for c in key) or not key.isascii():
         raise ValueError('Model API key is missing or invalid')
@@ -102,4 +114,8 @@ def load_settings(path: Path = ROOT / '.local/agent.env') -> Settings:
                     agent_thinking=thinking == 'enabled', reasoning_effort=effort,
                     context_budget_bytes=budget, model_requests_per_minute=model_rpm, tavily_key=values.get('TAVILY_API_KEY', ''),
                     model_source_ipv4=source_ipv4, model_dns_ipv4=dns_ipv4,
-                    web_monthly_limit=min(950, max(0, int(values.get('WEB_MONTHLY_LIMIT', '950')))))
+                    web_monthly_limit=min(950, max(0, int(values.get('WEB_MONTHLY_LIMIT', '950')))),
+                    langfuse_base_url=telemetry_fields[0], langfuse_public_key=telemetry_fields[1],
+                    langfuse_secret_key=telemetry_fields[2],
+                    langfuse_environment=values.get('LANGFUSE_TRACING_ENVIRONMENT', 'production'),
+                    langfuse_release=values.get('LANGFUSE_RELEASE', ''))

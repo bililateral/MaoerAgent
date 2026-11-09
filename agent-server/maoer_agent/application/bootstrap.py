@@ -14,6 +14,7 @@ from maoer_agent.research.web import WebResearch
 from maoer_agent.research.tools import ResearchTools
 from maoer_agent.application.sources import SourceQueries
 from maoer_agent.application.replies import query_reply
+from maoer_agent.telemetry import Telemetry
 
 
 @asynccontextmanager
@@ -21,6 +22,8 @@ async def task_service(settings, client, gate, path):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with ExitStack() as storage:
+        telemetry = Telemetry(settings)
+        storage.callback(telemetry.close)
         store = Store(path)
         storage.callback(store.close)
         knowledge = ResearchStore(path.parent / 'research.sqlite3')
@@ -36,8 +39,8 @@ async def task_service(settings, client, gate, path):
             saver = await services.enter_async_context(AsyncSqliteSaver.from_conn_string(str(path) + '.checkpoints'))
             research = ResearchTools(knowledge, rss, web,
                 ModelWebRelevanceJudge(settings.model, settings.context_budget_bytes))
-            tasks = AgentTasks(settings, saver, store, partial(generate, client=client, gate=gate), research, CATALOG, query_reply,
-                               query_scope_cleanup=knowledge.release_scope)
+            tasks = AgentTasks(settings, saver, store, partial(generate, client=client, gate=gate, telemetry=telemetry), research, CATALOG, query_reply,
+                               query_scope_cleanup=knowledge.release_scope, telemetry=telemetry)
             services.push_async_callback(tasks.close)
             rss.start()
             await tasks.recover()

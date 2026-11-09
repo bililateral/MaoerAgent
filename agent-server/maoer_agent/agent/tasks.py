@@ -17,15 +17,16 @@ from maoer_agent.runtime.dispatch import ToolDispatcher
 
 
 class AgentTasks:
-    def __init__(self, settings, saver, store, model, research, catalog, query_renderer, *, query_scope_cleanup):
+    def __init__(self, settings, saver, store, model, research, catalog, query_renderer, *, query_scope_cleanup, telemetry):
         self.settings, self.store = settings, store
         self.saver = saver
         self.deletion_lock = asyncio.Lock()
         self.model = model
+        self.telemetry = telemetry
         self.jobs = {}
         self.query_scope_cleanup = query_scope_cleanup
         self.dispatcher = ToolDispatcher(store, self.get_run)
-        self.graph = AgentGraph(settings, store, model, self.get_run, research, catalog, query_renderer).compile(saver)
+        self.graph = AgentGraph(settings, store, model, self.get_run, research, catalog, query_renderer, telemetry=telemetry).compile(saver)
 
     def launch(self, run_id, value):
         if run_id in self.jobs: raise TaskConflict('task_busy')
@@ -35,35 +36,38 @@ class AgentTasks:
         return self.dispatcher.advance_batch(run_id, calls)
 
     async def drive(self, run_id, value):
-        try:
-            # Keep conversation data local even if the shell has tracing env vars.
-            while True:
-                with tracing_context(enabled=False):
-                    result = await self.graph.ainvoke(value, {'configurable': {'thread_id': run_id}, 'recursion_limit': GRAPH_RECURSION_LIMIT}, durability='sync')
-                if result.get('__interrupt__'):
-                    results = self.advance_batch(run_id, result['calls'])
-                    if results is None:
+        with self.telemetry.segment(self.get_run(run_id), 'run.advance'):
+            try:
+                # Keep conversation data local even if the shell has tracing env vars.
+                while True:
+                    with tracing_context(enabled=False):
+                        result = await self.graph.ainvoke(value, {'configurable': {'thread_id': run_id}, 'recursion_limit': GRAPH_RECURSION_LIMIT}, durability='sync')
+                    if result.get('__interrupt__'):
+                        results = self.advance_batch(run_id, result['calls'])
+                        if results is None:
+                            break
+                        value = Command(resume=results)
+                    else:
+                        self.store.update(run_id, status='completed', calls=[], text=result['messages'][-1].get('content') or '',
+                                          history=last_turn(result['messages']), outcome=outcome_facts(last_turn(result['messages'])), memory=result.get('memory', {}), error='', error_detail={}, phase='', retry_after=0)
                         break
-                    value = Command(resume=results)
-                else:
-                    self.store.update(run_id, status='completed', calls=[], text=result['messages'][-1].get('content') or '',
-                                      history=last_turn(result['messages']), outcome=outcome_facts(last_turn(result['messages'])), memory=result.get('memory', {}), error='', error_detail={}, phase='', retry_after=0)
-                    break
-        except asyncio.CancelledError:
-            # Explicit cancellation and service shutdown choose their status outside this task.
-            raise
-        except ModelFailure as exc:
-            logging.getLogger('maoer.agent').warning('agent_run=%s phase=%s code=%s details=%s',
-                run_id, self.get_run(run_id).get('phase', 'unknown'), exc.code, exc.details)
-            self.store.update(run_id, status='failed', calls=[], error=exc.code, error_detail=exc.details, retry_after=exc.delay)
-        except Exception as exc:
-            details = {'origin': 'storage' if isinstance(exc, sqlite3.Error) else 'runtime',
-                       'failure_type': type(exc).__name__}
-            logging.getLogger('maoer.agent').warning('agent_run=%s failure=%s', run_id, failure_location(exc))
-            self.store.update(run_id, status='failed', calls=[],
-                              error='server_storage_error' if isinstance(exc, sqlite3.Error) else 'invalid_agent_response', error_detail=details)
-        finally:
-            self.jobs.pop(run_id, None)
+            except asyncio.CancelledError:
+                # Explicit cancellation and service shutdown choose their status outside this task.
+                raise
+            except ModelFailure as exc:
+                logging.getLogger('maoer.agent').warning('agent_run=%s phase=%s code=%s details=%s',
+                    run_id, self.get_run(run_id).get('phase', 'unknown'), exc.code, exc.details)
+                self.store.update(run_id, status='failed', calls=[], error=exc.code, error_detail=exc.details, retry_after=exc.delay)
+            except Exception as exc:
+                details = {'origin': 'storage' if isinstance(exc, sqlite3.Error) else 'runtime',
+                           'failure_type': type(exc).__name__}
+                logging.getLogger('maoer.agent').warning('agent_run=%s failure=%s', run_id, failure_location(exc))
+                self.store.update(run_id, status='failed', calls=[],
+                                  error='server_storage_error' if isinstance(exc, sqlite3.Error) else 'invalid_agent_response', error_detail=details)
+            finally:
+                run = self.get_run(run_id)
+                self.telemetry.event(run, 'run.state', output=self.telemetry.snapshot(run))
+                self.jobs.pop(run_id, None)
 
     def create(self, request):
         if self.store.deleted(request.conversation_id): raise TaskConflict('conversation_deleted')
@@ -95,10 +99,14 @@ class AgentTasks:
         return run
 
     def claim(self, run_id, call_id):
-        return self.dispatcher.claim(run_id, call_id)
+        run = self.dispatcher.claim(run_id, call_id)
+        self.telemetry.event(run, 'device.claim', input={'call_id': call_id})
+        return run
 
     def submit(self, run_id, results):
         result = self.dispatcher.submit(run_id, results, busy=run_id in self.jobs)
+        self.telemetry.event(result.run, 'device.submission', input=results,
+                             output={'resume': result.resume is not None, 'status': result.run['status']})
         if result.resume is not None:
             self.launch(run_id, Command(resume=result.resume))
         return result.run
@@ -111,6 +119,7 @@ class AgentTasks:
                 job.cancel()
                 await asyncio.gather(job, return_exceptions=True)
             run = self.store.update(run_id, status='cancelled', calls=[], error='', retry_after=0)
+            self.telemetry.event(run, 'run.cancelled', output=self.telemetry.snapshot(run))
         return run
 
     async def retry(self, run_id):
@@ -161,6 +170,7 @@ class AgentTasks:
                 await self.delete_conversation(conversation)
         for run in self.store.runs():
             if run['status'] in TERMINAL: continue
+            self.telemetry.event(run, 'run.recovery', output={'status': run['status']})
             with tracing_context(enabled=False):
                 snapshot = await self.graph.aget_state({'configurable': {'thread_id': run['id']}})
             messages = snapshot.values.get('messages', [])

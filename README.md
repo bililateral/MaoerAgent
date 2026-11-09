@@ -508,6 +508,16 @@ Linux用户目录可把fastembed依赖装入`.local/embedding-packages`；`start
 
 首次启动自动创建 `.local/agent-server.token`，它是本地接口访问令牌，与上游模型 API Key 不同。配置、令牌、虚拟环境和运行日志均位于 Git 忽略的 `.local/` 中。服务端不会把上游 Key 返回给客户端或打印到日志。模型接口使用 OpenAI 兼容协议，模型密钥读取 `AGENT_API_KEY`，网页工具读取 `TAVILY_API_KEY`。
 
+### 可选的 Langfuse 执行追踪
+
+服务端可通过 Python SDK 接入自托管 Langfuse OSS，记录模型输入输出、工具回执、任务状态、取消和检查点恢复事件。每个任务关联一条 trace，多轮会话通过 session 关联；恢复后沿用任务身份。任务数据库仍负责领取、去重和恢复，遥测异步上报。
+
+在服务端 Git 忽略的 `.local/langfuse.env` 配置 `LANGFUSE_BASE_URL`、`LANGFUSE_PUBLIC_KEY`、`LANGFUSE_SECRET_KEY`，可选 `LANGFUSE_TRACING_ENVIRONMENT` 和 `LANGFUSE_RELEASE`。不配置时关闭追踪；配置后重启 Agent 服务。SDK 4.18.0 支持项目的 Python 3.10 和 Langfuse 服务端 v4。项目密钥只保存在服务端，不放入 Android。
+
+Windows Docker Desktop 可运行平台；远端 Agent 可以通过 SSH 反向端口转发访问 Windows 发布的回环端口。两端的 `127.0.0.1` 分别属于各自机器，服务端 SDK 应填写服务器侧转发地址。Windows、Docker 和 SSH 隧道须保持运行；断开期间无法上报，业务继续，追踪可能缺失。
+
+追踪记录发送前移除配置密钥，思考正文只记录长度与指纹。Langfuse OSS 核心追踪、数据集和评分 API 免费；使用现有业务请求及人工／程序评分，不启用额外模型评分或平台 AI 服务。模型、手机执行和资料查询的调用预算保持现有规则。
+
 ### 连接 Android
 
 安装当前 Debug APK，保持电脑服务运行，对目标设备建立反向端口转发：

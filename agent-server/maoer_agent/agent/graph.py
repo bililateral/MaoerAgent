@@ -40,11 +40,12 @@ from maoer_agent.workflows import goals as task_goals
 
 
 class AgentGraph:
-    def __init__(self, settings, store, model, get_run, research, catalog, query_renderer):
+    def __init__(self, settings, store, model, get_run, research, catalog, query_renderer, *, telemetry):
         self.settings, self.store, self.model, self.get_run = settings, store, model, get_run
         self.research = research
         self.catalog = catalog
         self.query_renderer = query_renderer
+        self.telemetry = telemetry
         self.context = ContextAssembler()
         self.feed_urls = frozenset(i['feed_url'] for i in catalog)
 
@@ -57,7 +58,7 @@ class AgentGraph:
         self.store.update(run_id, model_attempts=usage)
         if purpose in {'intent','recovery_intent','quote_selection'}:
             messages=JsonMessages(messages)
-        token=model_call_context.set({'run_id':run_id,'purpose':purpose,'attempt':usage[purpose]})
+        token=model_call_context.set({'run_id':run_id,'conversation_id':run['conversation_id'],'purpose':purpose,'attempt':usage[purpose]})
         try:
             return await self.model(settings, messages, tools, publish)
         finally:
@@ -88,6 +89,7 @@ class AgentGraph:
         else:
             results[index] = receipt
         self.store.update(run_id, results=results, sources=sources)
+        self.telemetry.event(run, 'tool.receipt', input=call, output=receipt, metadata={'scope': 'validated_receipt'})
         return receipt
 
     def compile(self, saver):

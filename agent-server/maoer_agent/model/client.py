@@ -38,7 +38,7 @@ class _PublishFailure(Exception):
         self.error = error
 
 
-async def generate(settings, messages, tools, publish, *, client, gate):
+async def generate(settings, messages, tools, publish, *, client, gate, telemetry):
     try:
         payload = AgentChatRequest.model_validate({'messages': messages, 'tools': tools or None,
                                                   'tool_choice': 'auto' if tools else None,
@@ -64,6 +64,10 @@ async def generate(settings, messages, tools, publish, *, client, gate):
     events = 0
     usage = {}
     call_context = dict(model_call_context.get() or {})
+    observation = telemetry.start({'id': call_context['run_id'], 'conversation_id': call_context['conversation_id']},
+        'model.' + call_context['purpose'], kind='generation', input=body, model=settings.model,
+        metadata=call_context, model_parameters={'thinking': settings.agent_thinking, 'reasoning_effort': settings.reasoning_effort})
+    outcome = 'error'
     def details():
         return {**call_context, 'elapsed_ms': round((time.monotonic() - started) * 1000),
                 'headers_ms': None if headers_at is None else round((headers_at - started) * 1000),
@@ -137,7 +141,9 @@ async def generate(settings, messages, tools, publish, *, client, gate):
                         if len(call['function']['arguments']) > 16000:
                             raise ModelFailure('invalid_tool_call')
             raise ModelFailure('stream_interrupted')
-        return await asyncio.wait_for(read(), TOTAL_TIMEOUT)
+        result = await asyncio.wait_for(read(), TOTAL_TIMEOUT)
+        outcome = 'ok'
+        return result
     except _PublishFailure as exc:
         # The consumer owns its failures; upstream response translation must not
         # relabel storage/runtime errors raised while publishing a valid chunk.
@@ -155,6 +161,10 @@ async def generate(settings, messages, tools, publish, *, client, gate):
     except (ValueError, TypeError, KeyError, AttributeError):
         raise ModelFailure('invalid_model_response', details=details()) from None
     finally:
+        telemetry.finish(observation, output={'content': text, 'tool_calls': list(calls.values())},
+            metadata={**details(), 'outcome': outcome}, level='DEFAULT' if outcome == 'ok' else 'ERROR',
+            usage_details={k: usage[v] for k, v in [('input', 'prompt_tokens'), ('output', 'completion_tokens'),
+                ('total', 'total_tokens')] if v in usage})
         logging.getLogger('maoer.agent').info('model_timing %s', json.dumps(details()))
         try:
             if response is not None: await response.aclose()
