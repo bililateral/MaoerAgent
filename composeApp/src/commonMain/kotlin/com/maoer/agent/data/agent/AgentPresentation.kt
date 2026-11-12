@@ -31,7 +31,7 @@ internal fun agentScreenPresentation(state: AgentUiState): AgentScreenPresentati
         state.history.deletePending -> if (state.working) AgentAction.None else AgentAction.Delete
         state.working -> AgentAction.Stop
         pending || (last?.status == "failed" && last.error !in setOf(
-            "tool_round_limit", "model_attempt_budget_exhausted", "context_budget_exhausted")) ->
+            "tool_round_limit", "model_attempt_budget_exhausted", "context_budget_exhausted", "conversation_not_found")) ->
             if (last?.status == "failed") AgentAction.Retry else AgentAction.Recover
         else -> AgentAction.None
     }

@@ -3,6 +3,7 @@ import asyncio
 import logging
 import time
 import sqlite3
+import uuid
 from langgraph.types import Command
 from langsmith import tracing_context
 from maoer_agent.contracts.errors import ModelFailure
@@ -69,8 +70,15 @@ class AgentTasks:
                 self.telemetry.event(run, 'run.state', output=self.telemetry.snapshot(run))
                 self.jobs.pop(run_id, None)
 
+    def create_conversation(self):
+        conversation = str(uuid.uuid4())
+        self.store.create_conversation(conversation)
+        return conversation
+
     def create(self, request):
-        if self.store.deleted(request.conversation_id): raise TaskConflict('conversation_deleted')
+        status = self.store.conversation_status(request.conversation_id)
+        if status is None: raise TaskConflict('conversation_not_found')
+        if status == 'deleting': raise TaskConflict('conversation_busy')
         value = request.model_dump()
         try:
             existing = self.store.get(request.id)
@@ -95,7 +103,7 @@ class AgentTasks:
 
     def get_run(self, run_id):
         run = self.store.get(run_id)
-        if self.store.deleted(run['conversation_id']): raise KeyError(run_id)
+        if self.store.conversation_status(run['conversation_id']) != 'active': raise KeyError(run_id)
         return run
 
     def claim(self, run_id, call_id):
@@ -130,7 +138,7 @@ class AgentTasks:
             snapshot = await self.graph.aget_state({'configurable': {'thread_id': run_id}})
         # Deletion may begin while the checkpointer read is awaited.
         try: run = self.get_run(run_id)
-        except KeyError: raise TaskConflict('conversation_deleted') from None
+        except KeyError: raise TaskConflict('conversation_not_found') from None
         if run['status'] != 'failed' or run_id in self.jobs: raise TaskConflict('task_not_retryable')
         value = None
         interrupted = [task for task in snapshot.tasks if task.interrupts]
@@ -151,11 +159,13 @@ class AgentTasks:
 
     async def delete_conversation(self, conversation):
         async with self.deletion_lock:
+            if self.store.conversation_status(conversation) is None:
+                return
             runs = self.store.conversation(conversation)
             if any(r['status'] not in TERMINAL or r['id'] in self.jobs for r in runs):
                 raise TaskConflict('conversation_busy')
             # Durable intent precedes awaits. New tasks/retries cannot resurrect it.
-            self.store.mark_deleted(conversation)
+            self.store.mark_deleting(conversation)
             for run in runs:
                 await self.saver.adelete_thread(run['id'])
             # Keep rows until every checkpoint deletion succeeds, allowing restart
@@ -166,7 +176,7 @@ class AgentTasks:
     async def recover(self):
         conversations = self.store.conversations()
         for conversation in conversations:
-            if self.store.deleted(conversation):
+            if self.store.conversation_status(conversation) == 'deleting':
                 await self.delete_conversation(conversation)
         for run in self.store.runs():
             if run['status'] in TERMINAL: continue

@@ -64,6 +64,21 @@ class AgentApi(
     }
     suspend fun create(value: AgentNewRun): AgentRun =
         request("/v1/agent/runs", json.encodeToString(value), true)
+    suspend fun createConversation(): String {
+        val connection = connection()
+        if (connection.token.isBlank()) throw AppFailure("connection_missing")
+        val response = client.post(transport.endpoint(connection) + "/v1/agent/conversations") {
+            header(HttpHeaders.Authorization, "Bearer ${connection.token}")
+            contentType(ContentType.Application.Json)
+            setBody("{}")
+        }
+        val body = response.bodyAsText()
+        if (response.status.value !in 200..299) fail(body, response.status.value)
+        val id = json.decodeFromString<AgentConversation>(body).conversation_id
+        if (!Regex("[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}").matches(id))
+            throw AppFailure("service_response_invalid")
+        return id
+    }
     suspend fun get(id: String) = request("/v1/agent/runs/$id")
     suspend fun sourceText(id: String, number: Int): AgentSourceText {
         require(number in 1..48)

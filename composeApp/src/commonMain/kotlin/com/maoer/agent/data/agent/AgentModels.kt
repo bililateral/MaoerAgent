@@ -75,7 +75,7 @@ fun AgentConnection.validationError(): String? {
 
 @Serializable data class AgentSourceText(val text: String = "", val complete: Boolean = false, val source_url: String = "")
 @Serializable data class AgentTurn(val id: String, val question: String, val run: AgentRun? = null)
-@Serializable data class AgentHistory(val conversationId: String = agentId(), val turns: List<AgentTurn> = emptyList(), val cancelPending: String? = null, val deletePending: Boolean = false,
+@Serializable data class AgentHistory(val conversationId: String = "", val turns: List<AgentTurn> = emptyList(), val cancelPending: String? = null, val deletePending: Boolean = false,
                                      val starterQuestions: List<String> = emptyList())
 
 fun AgentHistory.requireRecoverableConnection(remote: AgentRun?) {
@@ -90,6 +90,7 @@ fun AgentHistory.requireRecoverableConnection(remote: AgentRun?) {
 }
 @Serializable data class AgentNewRun(val id: String, val conversation_id: String, val message: String,
                                    val personalized_search: Boolean = false)
+@Serializable data class AgentConversation(val conversation_id: String)
 @Serializable data class AgentResults(val results: List<AgentReceipt>)
 @Serializable data class AgentExecution(val fingerprint: String, val result: JsonObject? = null,
                                        val conversationId: String = "", val runId: String = "",

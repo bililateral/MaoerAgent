@@ -80,7 +80,21 @@ internal class AgentConversationController(private val storage: AgentStorage, pr
         work {
             val turn = AgentTurn(agentId(), question.trim())
             save(old.copy(turns = (old.turns + turn).takeLast(30)))
-            follow(api.create(AgentNewRun(turn.id, old.conversationId, turn.question, mutable.value.personalizedSearch)))
+            follow(createRun(turn))
+        }
+    }
+    private suspend fun createRun(turn: AgentTurn): AgentRun {
+        if (mutable.value.history.conversationId.isEmpty()) {
+            val id = api.createConversation()
+            save(mutable.value.history.copy(conversationId = id))
+        }
+        return try {
+            api.create(AgentNewRun(turn.id, mutable.value.history.conversationId, turn.question, mutable.value.personalizedSearch))
+        } catch (e: AgentApiException) {
+            if (e.code == "conversation_not_found") {
+                update(AgentRun(turn.id, mutable.value.history.conversationId, "failed", error = e.code))
+            }
+            throw e
         }
     }
     fun reconnect(retry: Boolean = false) = work {
@@ -106,7 +120,7 @@ internal class AgentConversationController(private val storage: AgentStorage, pr
         val turn = h.turns.lastOrNull() ?: return@work
         val run = try { api.get(turn.id) } catch (e: AgentApiException) {
             if (e.status != 404) throw e
-            api.create(AgentNewRun(turn.id, h.conversationId, turn.question, mutable.value.personalizedSearch))
+            createRun(turn)
         }
         follow(if (retry && run.status == "failed") api.retry(run.id) else run)
     }
@@ -131,7 +145,7 @@ internal class AgentConversationController(private val storage: AgentStorage, pr
         if (mutable.value.history.turns.lastOrNull()?.let { it.run?.terminal != true } == true) return
         work {
             val old = mutable.value.history
-            if (old.turns.isNotEmpty()) {
+            if (old.conversationId.isNotEmpty()) {
                 save(old.copy(deletePending = true))
                 finishNewConversation(mutable.value.history)
             } else save(AgentHistory(starterQuestions = agentStarterQuestions(old.starterQuestions)))

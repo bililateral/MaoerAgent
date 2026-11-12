@@ -1,5 +1,4 @@
-"""Durable task snapshots, summaries and deletion tombstones; no graph execution."""
-import hashlib
+"""Durable conversations, task snapshots and summaries; no graph execution."""
 import json
 import sqlite3
 from pathlib import Path
@@ -12,7 +11,7 @@ class Store:
         self.db.execute('PRAGMA journal_mode=WAL')
         self.db.execute('CREATE TABLE IF NOT EXISTS agent_runs (id TEXT PRIMARY KEY, conversation TEXT NOT NULL, body TEXT NOT NULL)')
         self.db.execute('CREATE INDEX IF NOT EXISTS agent_conversation ON agent_runs(conversation)')
-        self.db.execute('CREATE TABLE IF NOT EXISTS agent_deleted_conversations (id_hash TEXT PRIMARY KEY)')
+        self.db.execute('CREATE TABLE IF NOT EXISTS agent_conversations (id TEXT PRIMARY KEY, deleting INTEGER NOT NULL DEFAULT 0)')
         self.db.execute('CREATE TABLE IF NOT EXISTS agent_summaries (conversation TEXT PRIMARY KEY, body TEXT NOT NULL)')
         self.db.commit()
 
@@ -36,19 +35,22 @@ class Store:
         return [json.loads(r[0]) for r in self.db.execute(
             'SELECT body FROM agent_runs WHERE conversation=? ORDER BY rowid', (conversation,))]
 
-    def deleted(self, conversation):
-        digest = hashlib.sha256(conversation.encode()).hexdigest()
-        return self.db.execute('SELECT 1 FROM agent_deleted_conversations WHERE id_hash=?', (digest,)).fetchone() is not None
+    def create_conversation(self, conversation):
+        self.db.execute('INSERT INTO agent_conversations(id) VALUES (?)', (conversation,))
+        self.db.commit()
 
-    def mark_deleted(self, conversation):
-        # Keep no message content, only a fingerprint that rejects stale replays.
-        digest = hashlib.sha256(conversation.encode()).hexdigest()
-        self.db.execute('INSERT OR IGNORE INTO agent_deleted_conversations VALUES (?)', (digest,))
+    def conversation_status(self, conversation):
+        row = self.db.execute('SELECT deleting FROM agent_conversations WHERE id=?', (conversation,)).fetchone()
+        return None if row is None else ('deleting' if row[0] else 'active')
+
+    def mark_deleting(self, conversation):
+        self.db.execute('UPDATE agent_conversations SET deleting=1 WHERE id=?', (conversation,))
         self.db.commit()
 
     def remove_conversation(self, conversation):
         self.db.execute('DELETE FROM agent_runs WHERE conversation=?', (conversation,))
         self.db.execute('DELETE FROM agent_summaries WHERE conversation=?', (conversation,))
+        self.db.execute('DELETE FROM agent_conversations WHERE id=?', (conversation,))
         self.db.commit()
 
     def summary(self, conversation):
@@ -60,7 +62,7 @@ class Store:
         self.db.commit()
 
     def conversations(self):
-        return [r[0] for r in self.db.execute('SELECT DISTINCT conversation FROM agent_runs')]
+        return [r[0] for r in self.db.execute('SELECT id FROM agent_conversations')]
 
     def runs(self):
         return [json.loads(r[0]) for r in self.db.execute('SELECT body FROM agent_runs').fetchall()]

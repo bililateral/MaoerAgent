@@ -28,7 +28,7 @@
   "invalid_agent_response": "助手服务内部处理失败，具体原因需查看服务端记录。可重试当前步骤。",
   "episode_refresh_failed": "本轮分集查询未成功，尚未开始新的播放，请稍后重试",
   "conversation_busy": "当前对话还有未结束的任务",
-  "conversation_deleted": "旧对话已删除，请新建对话",
+  "conversation_not_found": "对话不存在，请新建对话",
   "conversation_delete_failed": "服务端删除未完成，请重试删除",
   "unknown_error": "操作未完成，具体原因尚未确认。请重试；若再次出现，请提供错误码 {code}。",
   "model_timeout_connect": "服务器连接模型服务超时，尚未建立连接。请稍后重试当前步骤。",

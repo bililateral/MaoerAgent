@@ -36,13 +36,28 @@ def register(app, settings):
 
     @app.exception_handler(TaskConflict)
     async def conflict(request, exc):
-        return JSONResponse({'error': {'code': str(exc)}}, 409)
+        return JSONResponse({'error': {'code': str(exc)}}, 404 if str(exc) == 'conversation_not_found' else 409)
 
     @app.exception_handler(sqlite3.Error)
     async def storage_failure(request, exc):
         return JSONResponse({'error': {'code': 'server_storage_error'}}, 503)
 
     public = run_response
+
+    @app.post('/v1/agent/conversations')
+    async def create_conversation(request: Request):
+        refusal = await authorized(request)
+        if refusal: return refusal
+        try:
+            if await body(request) != {}:
+                raise ValueError('empty_object_required')
+        except asyncio.TimeoutError:
+            return JSONResponse({'error': {'code': 'request_timeout'}}, 408)
+        except OverflowError:
+            return JSONResponse({'error': {'code': 'body_too_large'}}, 413)
+        except (ValueError, RecursionError):
+            return JSONResponse({'error': {'code': 'invalid_request'}}, 400)
+        return JSONResponse({'conversation_id': app.state.agent.create_conversation()}, 201)
 
     @app.post('/v1/agent/runs')
     async def create(request: Request):
